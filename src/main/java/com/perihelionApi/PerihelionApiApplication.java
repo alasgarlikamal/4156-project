@@ -1,13 +1,13 @@
-package com.example.project;
+package com.perihelionApi;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class ProjectApplication {
+public class PerihelionApiApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ProjectApplication.class, args);
+		SpringApplication.run(PerihelionApiApplication.class, args);
 	}
 
 }
