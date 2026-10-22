@@ -59,7 +59,7 @@ class CourseServiceTest {
 	@Test
 	void deleteRejectsCourseWithEnrollments() {
 		when(courseRepository.existsById(1L)).thenReturn(true);
-		when(enrollmentRepository.existsByCourse_Id(1L)).thenReturn(true);
+		when(enrollmentRepository.existsByCourseId(1L)).thenReturn(true);
 
 		ConflictException exception = assertThrows(ConflictException.class, () -> courseService.delete(1L));
 
@@ -72,7 +72,7 @@ class CourseServiceTest {
 		when(courseRepository.existsById(9L)).thenReturn(false);
 
 		assertThrows(NotFoundException.class, () -> courseService.delete(9L));
-		verify(enrollmentRepository, never()).existsByCourse_Id(any());
+		verify(enrollmentRepository, never()).existsByCourseId(any());
 		verify(courseRepository, never()).deleteById(any());
 	}
 
