@@ -1,3 +1,6 @@
+/*
+	AI usage:Course and Enrollment Tests: Grok 4.7, ~111K tokens
+ */
 package com.perihelionApi.course;
 
 import static org.hamcrest.Matchers.containsString;
