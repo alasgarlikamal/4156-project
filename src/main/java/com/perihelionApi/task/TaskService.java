@@ -17,7 +17,7 @@ public class TaskService {
     /**
      * Creates a task service.
      *
-     * @param taskRepository repository used to access task records
+     * @param repository repository used to access task records
      */
     public TaskService(final TaskRepository repository) {
         this.taskRepository = repository;

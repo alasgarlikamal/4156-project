@@ -26,7 +26,7 @@ public class TaskController {
     /**
      * Creates a task controller.
      *
-     * @param taskService service used to manage tasks
+     * @param service service used to manage tasks
      */
     public TaskController(final TaskService service) {
         this.taskService = service;

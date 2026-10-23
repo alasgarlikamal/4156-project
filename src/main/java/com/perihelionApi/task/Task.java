@@ -63,7 +63,7 @@ public class Task {
     /**
      * Sets the task identifier.
      *
-     * @param id the task identifier
+     * @param newId the task identifier
      */
     public void setId(final Integer newId) {
         this.id = newId;
@@ -81,7 +81,7 @@ public class Task {
     /**
      * Sets the associated work plan identifier.
      *
-     * @param workplanId the work plan identifier
+     * @param newWorkplanId the work plan identifier
      */
     public void setWorkplanId(final Integer newWorkplanId) {
         this.workplanId = newWorkplanId;
@@ -99,7 +99,7 @@ public class Task {
     /**
      * Sets the associated coursework identifier.
      *
-     * @param courseworkId the coursework identifier
+     * @param newCourseworkId the coursework identifier
      */
     public void setCourseworkId(final Integer newCourseworkId) {
         this.courseworkId = newCourseworkId;
@@ -117,7 +117,7 @@ public class Task {
     /**
      * Sets the associated enrollment identifier.
      *
-     * @param enrollmentId the enrollment identifier
+     * @param newEnrollmentId the enrollment identifier
      */
     public void setEnrollmentId(final Integer newEnrollmentId) {
         this.enrollmentId = newEnrollmentId;
@@ -135,7 +135,7 @@ public class Task {
     /**
      * Sets the task title.
      *
-     * @param title the task title
+     * @param newTitle the task title
      */
     public void setTitle(final String newTitle) {
         this.title = newTitle;
@@ -153,7 +153,7 @@ public class Task {
     /**
      * Sets the target completion date.
      *
-     * @param targetDate the target completion date
+     * @param newTargetDate the target completion date
      */
     public void setTargetDate(final LocalDate newTargetDate) {
         this.targetDate = newTargetDate;
@@ -171,7 +171,7 @@ public class Task {
     /**
      * Sets the estimated work hours.
      *
-     * @param estimatedWorkHours the estimated work hours
+     * @param newEstimatedWorkHours the estimated work hours
      */
     public void setEstimatedWorkHours(final Float newEstimatedWorkHours) {
         this.estimatedWorkHours = newEstimatedWorkHours;
