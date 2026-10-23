@@ -13,6 +13,7 @@ import com.perihelionApi.common.ConflictException;
 import com.perihelionApi.common.NotFoundException;
 import com.perihelionApi.course.Course;
 import com.perihelionApi.course.CourseRepository;
+import com.perihelionApi.submission.SubmissionRepository;
 
 /**
  * Business logic for enrollments.
@@ -27,16 +28,22 @@ public class EnrollmentService {
     /** Persistence for courses, used to resolve the enrolled course. */
     private final CourseRepository courseRepository;
 
+    /** Persistence for submissions, used to guard deletes. */
+    private final SubmissionRepository submissionRepository;
+
     /**
      * Creates the service.
      *
      * @param enrollmentRepository the enrollment repository
      * @param courseRepository     the course repository
+     * @param submissionRepository the submission repository
      */
     public EnrollmentService(final EnrollmentRepository enrollmentRepository,
-            final CourseRepository courseRepository) {
+            final CourseRepository courseRepository,
+            final SubmissionRepository submissionRepository) {
         this.enrollmentRepository = enrollmentRepository;
         this.courseRepository = courseRepository;
+        this.submissionRepository = submissionRepository;
     }
 
     /**
@@ -130,10 +137,15 @@ public class EnrollmentService {
      *
      * @param id the enrollment id
      * @throws NotFoundException if no enrollment has the given id
+     * @throws ConflictException if the enrollment has submissions
      */
     public void delete(final Long id) {
         if (!enrollmentRepository.existsById(id)) {
             throw new NotFoundException("Enrollment not found");
+        }
+        if (submissionRepository.existsByEnrollmentId(id)) {
+            throw new ConflictException(
+                    "Enrollment cannot be deleted while submissions exist");
         }
         enrollmentRepository.deleteById(id);
     }

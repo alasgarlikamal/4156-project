@@ -24,6 +24,7 @@ import com.perihelionApi.common.ConflictException;
 import com.perihelionApi.common.NotFoundException;
 import com.perihelionApi.course.Course;
 import com.perihelionApi.course.CourseRepository;
+import com.perihelionApi.submission.SubmissionRepository;
 
 @ExtendWith(MockitoExtension.class)
 class EnrollmentServiceTest {
@@ -35,6 +36,9 @@ class EnrollmentServiceTest {
 
 	@Mock
 	private CourseRepository courseRepository;
+
+	@Mock
+	private SubmissionRepository submissionRepository;
 
 	@InjectMocks
 	private EnrollmentService enrollmentService;
@@ -80,6 +84,17 @@ class EnrollmentServiceTest {
 		verify(enrollmentRepository).save(captor.capture());
 		assertEquals(course, captor.getValue().getCourse());
 		assertEquals(LEARNER.toString(), captor.getValue().getLearnerRef());
+	}
+
+	@Test
+	void deleteRejectsEnrollmentWithSubmissions() {
+		when(enrollmentRepository.existsById(8L)).thenReturn(true);
+		when(submissionRepository.existsByEnrollmentId(8L)).thenReturn(true);
+
+		ConflictException exception = assertThrows(ConflictException.class, () -> enrollmentService.delete(8L));
+
+		assertEquals("Enrollment cannot be deleted while submissions exist", exception.getMessage());
+		verify(enrollmentRepository, never()).deleteById(any());
 	}
 
 	private static Course course(Long id) {
