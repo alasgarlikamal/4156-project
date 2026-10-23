@@ -28,8 +28,8 @@ public class TaskController {
      *
      * @param taskService service used to manage tasks
      */
-    public TaskController(final TaskService taskService) {
-        this.taskService = taskService;
+    public TaskController(final TaskService service) {
+        this.taskService = service;
     }
 
     /**

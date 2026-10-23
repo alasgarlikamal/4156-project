@@ -14,7 +14,7 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
      * @param enrollmentId the enrollment identifier
      * @return tasks belonging to the enrollment
      */
-    List<Task> findByEnrollmentId(final Integer enrollmentId);
+    List<Task> findByEnrollmentId(Integer enrollmentId);
 
     /**
      * Finds tasks associated with a work plan.
@@ -22,7 +22,7 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
      * @param workplanId the work plan identifier
      * @return tasks belonging to the work plan
      */
-    List<Task> findByWorkplanId(final Integer workplanId);
+    List<Task> findByWorkplanId(Integer workplanId);
 
     /**
      * Finds tasks associated with coursework.
@@ -30,5 +30,5 @@ public interface TaskRepository extends JpaRepository<Task, Integer> {
      * @param courseworkId the coursework identifier
      * @return tasks belonging to the coursework
      */
-    List<Task> findByCourseworkId(final Integer courseworkId);
+    List<Task> findByCourseworkId(Integer courseworkId);
 }
