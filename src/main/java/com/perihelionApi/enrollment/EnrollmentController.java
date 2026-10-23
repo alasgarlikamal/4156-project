@@ -1,5 +1,5 @@
 /*
-	AI usage: Course and Enrollment CRUD: Grok 4.7, ~111K tokens
+    AI usage: Course and Enrollment CRUD: Grok 4.7, ~111K tokens
  */
 package com.perihelionApi.enrollment;
 
@@ -20,41 +20,86 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+/**
+ * REST endpoints for creating, reading, updating, and deleting enrollments.
+ */
 @RestController
 @RequestMapping("/api/enrollments")
 public class EnrollmentController {
 
-	private final EnrollmentService enrollmentService;
+    /** Business logic for enrollments. */
+    private final EnrollmentService enrollmentService;
 
-	public EnrollmentController(EnrollmentService enrollmentService) {
-		this.enrollmentService = enrollmentService;
-	}
+    /**
+     * Creates the controller.
+     *
+     * @param enrollmentService the enrollment service
+     */
+    public EnrollmentController(final EnrollmentService enrollmentService) {
+        this.enrollmentService = enrollmentService;
+    }
 
-	@PostMapping
-	public ResponseEntity<EnrollmentResponse> create(@Valid @RequestBody EnrollmentRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(enrollmentService.create(request));
-	}
+    /**
+     * Creates an enrollment.
+     *
+     * @param request the enrollment to create
+     * @return a 201 response with the created enrollment
+     */
+    @PostMapping
+    public ResponseEntity<EnrollmentResponse> create(
+            @Valid @RequestBody final EnrollmentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(enrollmentService.create(request));
+    }
 
-	@GetMapping
-	public List<EnrollmentResponse> list(@RequestParam(required = false) Long courseId,
-			@RequestParam(required = false) UUID learnerRef) {
-		return enrollmentService.list(courseId, learnerRef);
-	}
+    /**
+     * Lists enrollments, optionally filtered by course and learner.
+     *
+     * @param courseId   a course id, or null
+     * @param learnerRef a learner identifier, or null
+     * @return the matching enrollments ordered by id
+     */
+    @GetMapping
+    public List<EnrollmentResponse> list(
+            @RequestParam(required = false) final Long courseId,
+            @RequestParam(required = false) final UUID learnerRef) {
+        return enrollmentService.list(courseId, learnerRef);
+    }
 
-	@GetMapping("/{id}")
-	public EnrollmentResponse get(@PathVariable Long id) {
-		return enrollmentService.get(id);
-	}
+    /**
+     * Returns a single enrollment.
+     *
+     * @param id the enrollment id
+     * @return the enrollment
+     */
+    @GetMapping("/{id}")
+    public EnrollmentResponse get(@PathVariable final Long id) {
+        return enrollmentService.get(id);
+    }
 
-	@PutMapping("/{id}")
-	public EnrollmentResponse update(@PathVariable Long id, @Valid @RequestBody EnrollmentRequest request) {
-		return enrollmentService.update(id, request);
-	}
+    /**
+     * Replaces an enrollment.
+     *
+     * @param id      the enrollment id
+     * @param request the new enrollment values
+     * @return the updated enrollment
+     */
+    @PutMapping("/{id}")
+    public EnrollmentResponse update(@PathVariable final Long id,
+            @Valid @RequestBody final EnrollmentRequest request) {
+        return enrollmentService.update(id, request);
+    }
 
-	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> delete(@PathVariable Long id) {
-		enrollmentService.delete(id);
-		return ResponseEntity.noContent().build();
-	}
+    /**
+     * Deletes an enrollment.
+     *
+     * @param id the enrollment id
+     * @return a 204 response
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable final Long id) {
+        enrollmentService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 
 }

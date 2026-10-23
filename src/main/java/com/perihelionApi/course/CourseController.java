@@ -1,5 +1,5 @@
 /*
-	AI usage: Course and Enrollment CRUD: Grok 4.7, ~111K tokens
+    AI usage: Course and Enrollment CRUD: Grok 4.7, ~111K tokens
  */
 package com.perihelionApi.course;
 
@@ -19,41 +19,86 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+/**
+ * REST endpoints for creating, reading, updating, and deleting courses.
+ */
 @RestController
 @RequestMapping("/api/courses")
 public class CourseController {
 
-	private final CourseService courseService;
+    /** Business logic for courses. */
+    private final CourseService courseService;
 
-	public CourseController(CourseService courseService) {
-		this.courseService = courseService;
-	}
+    /**
+     * Creates the controller.
+     *
+     * @param courseService the course service
+     */
+    public CourseController(final CourseService courseService) {
+        this.courseService = courseService;
+    }
 
-	@PostMapping
-	public ResponseEntity<CourseResponse> create(@Valid @RequestBody CourseRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(courseService.create(request));
-	}
+    /**
+     * Creates a course.
+     *
+     * @param request the course to create
+     * @return a 201 response with the created course
+     */
+    @PostMapping
+    public ResponseEntity<CourseResponse> create(
+            @Valid @RequestBody final CourseRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(courseService.create(request));
+    }
 
-	@GetMapping
-	public List<CourseResponse> list(@RequestParam(required = false) String title,
-			@RequestParam(required = false) String code) {
-		return courseService.list(title, code);
-	}
+    /**
+     * Lists courses, optionally filtered by title substring and code.
+     *
+     * @param title a case-insensitive title fragment, or null
+     * @param code  an exact course code, or null
+     * @return the matching courses ordered by title
+     */
+    @GetMapping
+    public List<CourseResponse> list(
+            @RequestParam(required = false) final String title,
+            @RequestParam(required = false) final String code) {
+        return courseService.list(title, code);
+    }
 
-	@GetMapping("/{id}")
-	public CourseResponse get(@PathVariable Long id) {
-		return courseService.get(id);
-	}
+    /**
+     * Returns a single course.
+     *
+     * @param id the course id
+     * @return the course
+     */
+    @GetMapping("/{id}")
+    public CourseResponse get(@PathVariable final Long id) {
+        return courseService.get(id);
+    }
 
-	@PutMapping("/{id}")
-	public CourseResponse update(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
-		return courseService.update(id, request);
-	}
+    /**
+     * Replaces a course.
+     *
+     * @param id      the course id
+     * @param request the new course values
+     * @return the updated course
+     */
+    @PutMapping("/{id}")
+    public CourseResponse update(@PathVariable final Long id,
+            @Valid @RequestBody final CourseRequest request) {
+        return courseService.update(id, request);
+    }
 
-	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> delete(@PathVariable Long id) {
-		courseService.delete(id);
-		return ResponseEntity.noContent().build();
-	}
+    /**
+     * Deletes a course.
+     *
+     * @param id the course id
+     * @return a 204 response
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable final Long id) {
+        courseService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 
 }

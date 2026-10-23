@@ -51,7 +51,7 @@ class EnrollmentServiceTest {
 	void createRejectsDuplicateCourseAndLearner() {
 		Course course = course(1L);
 		when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
-		when(enrollmentRepository.existsByCourse_IdAndLearnerRef(1L, LEARNER.toString())).thenReturn(true);
+		when(enrollmentRepository.existsByCourseIdAndLearnerRef(1L, LEARNER.toString())).thenReturn(true);
 
 		ConflictException exception = assertThrows(ConflictException.class,
 				() -> enrollmentService.create(new EnrollmentRequest(1L, LEARNER)));
@@ -64,7 +64,7 @@ class EnrollmentServiceTest {
 	void createSavesEnrollmentForExistingCourse() {
 		Course course = course(4L);
 		when(courseRepository.findById(4L)).thenReturn(Optional.of(course));
-		when(enrollmentRepository.existsByCourse_IdAndLearnerRef(4L, LEARNER.toString())).thenReturn(false);
+		when(enrollmentRepository.existsByCourseIdAndLearnerRef(4L, LEARNER.toString())).thenReturn(false);
 		when(enrollmentRepository.save(any(Enrollment.class))).thenAnswer(invocation -> {
 			Enrollment enrollment = invocation.getArgument(0);
 			enrollment.setId(8L);
