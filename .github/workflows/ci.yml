@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Checkstyle
+        run: ./mvnw -B -ntp checkstyle:check
+
+      # Run even if Checkstyle failed so both results show up in one run.
+      # Checkstyle is skipped here because the previous step already ran it.
+      - name: Build and run unit tests
+        if: success() || failure()
+        run: ./mvnw -B -ntp verify -Dcheckstyle.skip
