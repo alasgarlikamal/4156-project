@@ -1,4 +1,4 @@
 /**
- * Root package for the Perihelion API Spring Boot application.
+ * Provides the Perihelion API application and its feature packages.
  */
 package com.perihelionApi;
