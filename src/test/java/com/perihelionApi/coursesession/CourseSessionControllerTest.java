@@ -80,6 +80,25 @@ class CourseSessionControllerTest {
     }
 
     @Test
+    void createRejectsMissingStartOrEndTime() throws Exception {
+        mockMvc.perform(post("/api/courses/1/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"weekday":1,"endTime":"15:15"}
+                        """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/courses/1/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"weekday":1,"startTime":"14:00"}
+                        """))
+                .andExpect(status().isBadRequest());
+
+        verify(sessionService, never()).create(any(), any());
+    }
+
+    @Test
     void listReturnsCourseSessions() throws Exception {
         when(sessionService.list(1L)).thenReturn(List.of(
                 new CourseSessionResponse(3L, 1L, 1,
