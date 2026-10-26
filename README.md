@@ -35,3 +35,23 @@ returning 409 through the shared exception handler.
 
 Run tests and Checkstyle with `./mvnw test`. Assignment tests include MockMvc
 controller tests, Mockito service tests, and an in-memory SQLite CRUD test.
+
+## Course sessions and calendar export
+
+Weekly course meetings belong to a course and use ISO weekday numbers
+(Monday = 1 through Sunday = 7). Times use `HH:mm` local time in
+`America/New_York`. Create and manage sessions at
+`/api/courses/{courseId}/sessions`; download all occurrences between the
+course's inclusive term dates from `/api/courses/{courseId}/calendar.ics`.
+The calendar export expands each weekly session to dated events and encodes
+the resulting instants in UTC.
+
+Example session body:
+
+```json
+{
+  "weekday": 1,
+  "startTime": "14:00",
+  "endTime": "15:15"
+}
+```
