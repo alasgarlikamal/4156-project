@@ -1,3 +1,4 @@
+// Wrote file with github copilot used 7.5 credits
 package com.perihelionApi.coursesession;
 
 import static org.mockito.ArgumentMatchers.any;
