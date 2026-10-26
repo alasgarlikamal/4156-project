@@ -17,6 +17,16 @@ CREATE TABLE IF NOT EXISTS enrollment (
     constraint fk_enrollment_course foreign key (course_id) references course (id)
 );
 
+CREATE TABLE IF NOT EXISTS assignment (
+    id integer,
+    course_id bigint not null,
+    title varchar(255) not null,
+    due_date date not null,
+    estimated_work_hours numeric not null,
+    primary key (id),
+    constraint fk_assignment_course foreign key (course_id) references course (id)
+);
+
 CREATE TABLE IF NOT EXISTS coursework (
     id integer,
     course_id bigint not null,
