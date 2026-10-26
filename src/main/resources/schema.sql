@@ -8,6 +8,20 @@ CREATE TABLE IF NOT EXISTS course (
     primary key (id)
 );
 
+CREATE TABLE IF NOT EXISTS course_session (
+    id integer,
+    course_id bigint not null,
+    weekday integer not null check (weekday between 1 and 7),
+    start_time time not null,
+    end_time time not null,
+    primary key (id),
+    constraint course_session_time_ck check (end_time > start_time),
+    constraint course_session_course_weekday_time_uk
+        unique (course_id, weekday, start_time, end_time),
+    constraint fk_course_session_course
+        foreign key (course_id) references course (id)
+);
+
 CREATE TABLE IF NOT EXISTS enrollment (
     id integer,
     learner_ref varchar(255) not null,
