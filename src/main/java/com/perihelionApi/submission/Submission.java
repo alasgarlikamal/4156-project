@@ -1,7 +1,11 @@
+/*
+    AI usage: Submission coursework link: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import java.time.Instant;
 
+import com.perihelionApi.coursework.Coursework;
 import com.perihelionApi.enrollment.Enrollment;
 
 import jakarta.persistence.Column;
@@ -38,11 +42,10 @@ public class Submission {
     @JoinColumn(name = "enrollment_id", nullable = false)
     private Enrollment enrollment;
 
-    /**
-     * Id of the submitted coursework.
-     */
-    @Column(name = "coursework_id", nullable = false)
-    private Long courseworkId;
+    /** The submitted coursework. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "coursework_id", nullable = false)
+    private Coursework coursework;
 
     /** When the work was submitted. */
     @Column(name = "submitted_at", nullable = false)
@@ -85,21 +88,21 @@ public class Submission {
     }
 
     /**
-     * Returns the submitted coursework id.
+     * Returns the submitted coursework.
      *
-     * @return the coursework id
+     * @return the coursework
      */
-    public Long getCourseworkId() {
-        return courseworkId;
+    public Coursework getCoursework() {
+        return coursework;
     }
 
     /**
-     * Sets the submitted coursework id.
+     * Sets the submitted coursework.
      *
-     * @param courseworkId the coursework id
+     * @param coursework the coursework
      */
-    public void setCourseworkId(final Long courseworkId) {
-        this.courseworkId = courseworkId;
+    public void setCoursework(final Coursework coursework) {
+        this.coursework = coursework;
     }
 
     /**

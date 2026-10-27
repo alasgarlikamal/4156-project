@@ -1,3 +1,6 @@
+/*
+    AI usage: Submission coursework link: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import java.util.List;

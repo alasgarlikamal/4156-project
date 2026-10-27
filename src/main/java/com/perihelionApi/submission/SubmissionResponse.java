@@ -1,3 +1,6 @@
+/*
+    AI usage: Submission coursework link: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import java.time.Instant;
@@ -22,7 +25,7 @@ public record SubmissionResponse(Long id, Long enrollmentId,
     public static SubmissionResponse from(final Submission submission) {
         return new SubmissionResponse(submission.getId(),
                 submission.getEnrollment().getId(),
-                submission.getCourseworkId(),
+                submission.getCoursework().getId(),
                 submission.getSubmittedAt());
     }
 

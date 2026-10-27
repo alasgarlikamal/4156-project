@@ -1,3 +1,6 @@
+/*
+	AI usage: Submission tests: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,6 +25,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.perihelionApi.common.ConflictException;
 import com.perihelionApi.common.NotFoundException;
+import com.perihelionApi.course.Course;
+import com.perihelionApi.coursework.Coursework;
+import com.perihelionApi.coursework.CourseworkRepository;
 import com.perihelionApi.enrollment.Enrollment;
 import com.perihelionApi.enrollment.EnrollmentRepository;
 
@@ -29,12 +35,16 @@ import com.perihelionApi.enrollment.EnrollmentRepository;
 class SubmissionServiceTest {
 
 	private static final Instant SUBMITTED_AT = Instant.parse("2026-10-20T15:30:00Z");
+	private static final Course COURSE = course(1L);
 
 	@Mock
 	private SubmissionRepository submissionRepository;
 
 	@Mock
 	private EnrollmentRepository enrollmentRepository;
+
+	@Mock
+	private CourseworkRepository courseworkRepository;
 
 	@InjectMocks
 	private SubmissionService submissionService;
@@ -52,8 +62,33 @@ class SubmissionServiceTest {
 		}
 
 		@Test
+		void rejectsMissingCoursework() {
+			when(enrollmentRepository.findById(1L)).thenReturn(Optional.of(enrollment(1L)));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.empty());
+
+			NotFoundException exception = assertThrows(NotFoundException.class,
+					() -> submissionService.create(new SubmissionRequest(1L, 3L, SUBMITTED_AT)));
+
+			assertEquals("Coursework not found", exception.getMessage());
+			verify(submissionRepository, never()).save(any());
+		}
+
+		@Test
+		void rejectsCourseworkFromAnotherCourse() {
+			when(enrollmentRepository.findById(1L)).thenReturn(Optional.of(enrollment(1L)));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.of(coursework(3L, course(2L))));
+
+			ConflictException exception = assertThrows(ConflictException.class,
+					() -> submissionService.create(new SubmissionRequest(1L, 3L, SUBMITTED_AT)));
+
+			assertEquals("Coursework must belong to the enrollment's course", exception.getMessage());
+			verify(submissionRepository, never()).save(any());
+		}
+
+		@Test
 		void rejectsDuplicateEnrollmentAndCoursework() {
 			when(enrollmentRepository.findById(1L)).thenReturn(Optional.of(enrollment(1L)));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.of(coursework(3L, COURSE)));
 			when(submissionRepository.existsByEnrollmentIdAndCourseworkId(1L, 3L)).thenReturn(true);
 
 			ConflictException exception = assertThrows(ConflictException.class,
@@ -66,7 +101,9 @@ class SubmissionServiceTest {
 		@Test
 		void savesSubmissionWithGivenTime() {
 			Enrollment enrollment = enrollment(4L);
+			Coursework coursework = coursework(3L, COURSE);
 			when(enrollmentRepository.findById(4L)).thenReturn(Optional.of(enrollment));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.of(coursework));
 			when(submissionRepository.existsByEnrollmentIdAndCourseworkId(4L, 3L)).thenReturn(false);
 			when(submissionRepository.save(any(Submission.class))).thenAnswer(invocation -> {
 				Submission submission = invocation.getArgument(0);
@@ -80,11 +117,13 @@ class SubmissionServiceTest {
 			ArgumentCaptor<Submission> captor = ArgumentCaptor.forClass(Submission.class);
 			verify(submissionRepository).save(captor.capture());
 			assertEquals(enrollment, captor.getValue().getEnrollment());
+			assertEquals(coursework, captor.getValue().getCoursework());
 		}
 
 		@Test
 		void defaultsSubmittedAtToNow() {
 			when(enrollmentRepository.findById(4L)).thenReturn(Optional.of(enrollment(4L)));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.of(coursework(3L, COURSE)));
 			when(submissionRepository.save(any(Submission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 			Instant before = Instant.now();
 
@@ -158,6 +197,7 @@ class SubmissionServiceTest {
 		void rejectsDuplicateOfAnotherSubmission() {
 			when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission(5L, 4L, 3L)));
 			when(enrollmentRepository.findById(4L)).thenReturn(Optional.of(enrollment(4L)));
+			when(courseworkRepository.findById(7L)).thenReturn(Optional.of(coursework(7L, COURSE)));
 			when(submissionRepository.existsByEnrollmentIdAndCourseworkIdAndIdNot(4L, 7L, 5L)).thenReturn(true);
 
 			assertThrows(ConflictException.class,
@@ -169,6 +209,7 @@ class SubmissionServiceTest {
 		void keepsSubmittedAtWhenOmitted() {
 			when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission(5L, 4L, 3L)));
 			when(enrollmentRepository.findById(4L)).thenReturn(Optional.of(enrollment(4L)));
+			when(courseworkRepository.findById(7L)).thenReturn(Optional.of(coursework(7L, COURSE)));
 			when(submissionRepository.save(any(Submission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 			SubmissionResponse response = submissionService.update(5L, new SubmissionRequest(4L, 7L, null));
@@ -181,6 +222,7 @@ class SubmissionServiceTest {
 			Instant later = SUBMITTED_AT.plusSeconds(3600);
 			when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission(5L, 4L, 3L)));
 			when(enrollmentRepository.findById(4L)).thenReturn(Optional.of(enrollment(4L)));
+			when(courseworkRepository.findById(3L)).thenReturn(Optional.of(coursework(3L, COURSE)));
 			when(submissionRepository.save(any(Submission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 			SubmissionResponse response = submissionService.update(5L, new SubmissionRequest(4L, 3L, later));
@@ -212,17 +254,31 @@ class SubmissionServiceTest {
 
 	}
 
+	private static Course course(Long id) {
+		Course course = new Course();
+		course.setId(id);
+		return course;
+	}
+
 	private static Enrollment enrollment(Long id) {
 		Enrollment enrollment = new Enrollment();
 		enrollment.setId(id);
+		enrollment.setCourse(COURSE);
 		return enrollment;
+	}
+
+	private static Coursework coursework(Long id, Course course) {
+		Coursework coursework = new Coursework();
+		coursework.setId(id);
+		coursework.setCourse(course);
+		return coursework;
 	}
 
 	private static Submission submission(Long id, Long enrollmentId, Long courseworkId) {
 		Submission submission = new Submission();
 		submission.setId(id);
 		submission.setEnrollment(enrollment(enrollmentId));
-		submission.setCourseworkId(courseworkId);
+		submission.setCoursework(coursework(courseworkId, COURSE));
 		submission.setSubmittedAt(SUBMITTED_AT);
 		return submission;
 	}

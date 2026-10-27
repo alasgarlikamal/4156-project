@@ -1,120 +1,176 @@
+/*
+    AI usage: Task CRUD: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.task;
 
+import java.time.LocalDate;
 import java.util.List;
-import org.springframework.http.HttpStatus;
+import java.util.Objects;
+
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.perihelionApi.common.ConflictException;
+import com.perihelionApi.common.NotFoundException;
+import com.perihelionApi.coursework.Coursework;
+import com.perihelionApi.coursework.CourseworkRepository;
+import com.perihelionApi.enrollment.Enrollment;
+import com.perihelionApi.enrollment.EnrollmentRepository;
+import com.perihelionApi.workplan.WorkPlan;
+import com.perihelionApi.workplan.WorkPlanRepository;
 
 /**
- * Provides business logic for managing tasks.
+ * Business logic for tasks.
  */
 @Service
+@Transactional
 public class TaskService {
 
-    /** Repository used to access task records. */
+    /** Persistence for tasks. */
     private final TaskRepository taskRepository;
 
+    /** Persistence for work plans, used to resolve the owning plan. */
+    private final WorkPlanRepository workPlanRepository;
+
+    /** Persistence for coursework, used to resolve the target work. */
+    private final CourseworkRepository courseworkRepository;
+
+    /** Persistence for enrollments, used to resolve the owner. */
+    private final EnrollmentRepository enrollmentRepository;
+
     /**
-     * Creates a task service.
+     * Creates the service.
      *
-     * @param repository repository used to access task records
+     * @param taskRepository       the task repository
+     * @param workPlanRepository   the work plan repository
+     * @param courseworkRepository the coursework repository
+     * @param enrollmentRepository the enrollment repository
      */
-    public TaskService(final TaskRepository repository) {
-        this.taskRepository = repository;
+    public TaskService(final TaskRepository taskRepository,
+            final WorkPlanRepository workPlanRepository,
+            final CourseworkRepository courseworkRepository,
+            final EnrollmentRepository enrollmentRepository) {
+        this.taskRepository = taskRepository;
+        this.workPlanRepository = workPlanRepository;
+        this.courseworkRepository = courseworkRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     /**
-     * Creates and saves a task.
+     * Creates and persists a task.
      *
-     * @param task the task to create
-     * @return the saved task
+     * @param request the task values
+     * @return the created task
+     * @throws NotFoundException if the work plan, coursework, or enrollment
+     *                           does not exist
+     * @throws ConflictException if the task is inconsistent with its work
+     *                           plan or enrollment
      */
-    public Task createTask(final Task task) {
-        return taskRepository.save(task);
+    public TaskResponse create(final TaskRequest request) {
+        Task task = new Task();
+        apply(task, request);
+        return TaskResponse.from(taskRepository.save(task));
     }
 
     /**
-     * Retrieves all tasks.
+     * Returns a single task.
      *
-     * @return all stored tasks
+     * @param id the task id
+     * @return the task
+     * @throws NotFoundException if no task has the given id
      */
-    public List<Task> getAllTasks() {
-        return taskRepository.findAll();
+    @Transactional(readOnly = true)
+    public TaskResponse get(final Long id) {
+        return TaskResponse.from(findTask(id));
     }
 
     /**
-     * Retrieves a task by its identifier.
+     * Lists tasks matching every supplied filter.
      *
-     * @param id the task identifier
-     * @return the matching task
-     * @throws ResponseStatusException if the task does not exist
+     * @param enrollmentId an enrollment id, or null
+     * @param workPlanId   a work plan id, or null
+     * @param courseworkId a coursework id, or null
+     * @return the matching tasks ordered by target date and id
      */
-    public Task getTaskById(final Integer id) {
-        return taskRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Task not found"));
+    @Transactional(readOnly = true)
+    public List<TaskResponse> list(final Long enrollmentId,
+            final Long workPlanId, final Long courseworkId) {
+        return taskRepository.search(enrollmentId, workPlanId, courseworkId)
+                .stream().map(TaskResponse::from).toList();
     }
 
     /**
-     * Retrieves tasks associated with an enrollment.
+     * Replaces a task.
      *
-     * @param enrollmentId the enrollment identifier
-     * @return tasks belonging to the enrollment
-     */
-    public List<Task> getTasksByEnrollment(final Integer enrollmentId) {
-        return taskRepository.findByEnrollmentId(enrollmentId);
-    }
-
-    /**
-     * Retrieves tasks associated with a work plan.
-     *
-     * @param workplanId the work plan identifier
-     * @return tasks belonging to the work plan
-     */
-    public List<Task> getTasksByWorkplan(final Integer workplanId) {
-        return taskRepository.findByWorkplanId(workplanId);
-    }
-
-    /**
-     * Retrieves tasks associated with coursework.
-     *
-     * @param courseworkId the coursework identifier
-     * @return tasks belonging to the coursework
-     */
-    public List<Task> getTasksByCoursework(final Integer courseworkId) {
-        return taskRepository.findByCourseworkId(courseworkId);
-    }
-
-    /**
-     * Updates an existing task.
-     *
-     * @param id the identifier of the task to update
-     * @param updatedTask the task containing the updated values
+     * @param id      the task id
+     * @param request the new task values
      * @return the updated task
-     * @throws ResponseStatusException if the task does not exist
+     * @throws NotFoundException if the task, work plan, coursework, or
+     *                           enrollment does not exist
+     * @throws ConflictException if the task is inconsistent with its work
+     *                           plan or enrollment
      */
-    public Task updateTask(final Integer id, final Task updatedTask) {
-        Task existingTask = getTaskById(id);
-
-        existingTask.setWorkplanId(updatedTask.getWorkplanId());
-        existingTask.setCourseworkId(updatedTask.getCourseworkId());
-        existingTask.setEnrollmentId(updatedTask.getEnrollmentId());
-        existingTask.setTitle(updatedTask.getTitle());
-        existingTask.setTargetDate(updatedTask.getTargetDate());
-        existingTask.setEstimatedWorkHours(
-                updatedTask.getEstimatedWorkHours());
-
-        return taskRepository.save(existingTask);
+    public TaskResponse update(final Long id, final TaskRequest request) {
+        Task task = findTask(id);
+        apply(task, request);
+        return TaskResponse.from(taskRepository.save(task));
     }
 
     /**
-     * Deletes a task by its identifier.
+     * Deletes a task.
      *
-     * @param id the identifier of the task to delete
-     * @throws ResponseStatusException if the task does not exist
+     * @param id the task id
+     * @throws NotFoundException if no task has the given id
      */
-    public void deleteTask(final Integer id) {
-        Task task = getTaskById(id);
-        taskRepository.delete(task);
+    public void delete(final Long id) {
+        if (!taskRepository.existsById(id)) {
+            throw new NotFoundException("Task not found");
+        }
+        taskRepository.deleteById(id);
     }
+
+    private Task findTask(final Long id) {
+        return taskRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Task not found"));
+    }
+
+    private void apply(final Task task, final TaskRequest request) {
+        WorkPlan workPlan = workPlanRepository
+                .findById(request.workPlanId())
+                .orElseThrow(
+                        () -> new NotFoundException("Work plan not found"));
+        Coursework coursework = courseworkRepository
+                .findById(request.courseworkId())
+                .orElseThrow(
+                        () -> new NotFoundException("Coursework not found"));
+        Enrollment enrollment = enrollmentRepository
+                .findById(request.enrollmentId())
+                .orElseThrow(
+                        () -> new NotFoundException("Enrollment not found"));
+
+        if (!Objects.equals(workPlan.getEnrollment().getId(),
+                enrollment.getId())) {
+            throw new ConflictException(
+                    "Task enrollment must match the work plan's enrollment");
+        }
+        if (!Objects.equals(coursework.getCourse().getId(),
+                enrollment.getCourse().getId())) {
+            throw new ConflictException(
+                    "Coursework must belong to the enrollment's course");
+        }
+        LocalDate target = request.targetDate();
+        if (target.isBefore(workPlan.getRangeStart())
+                || target.isAfter(workPlan.getRangeEnd())) {
+            throw new ConflictException(
+                    "targetDate must fall within the work plan's range");
+        }
+
+        task.setWorkPlan(workPlan);
+        task.setCoursework(coursework);
+        task.setEnrollment(enrollment);
+        task.setTitle(request.title());
+        task.setTargetDate(target);
+        task.setEstimatedWorkHours(request.estimatedWorkHours());
+    }
+
 }
