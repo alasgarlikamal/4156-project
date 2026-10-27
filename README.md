@@ -104,9 +104,9 @@ database, and the shared setup is in
 | Coverage XML / CSV | `target/site/jacoco/jacoco.xml` / `jacoco.csv` |
 
 The minimum required branch coverage is 55%; the current test suite reaches
-**100% branch coverage**.
+**89.6% branch coverage** (95 of 106 branches).
 
-![JaCoCo coverage report showing 100% branch coverage](docs/images/coverage-report.png)
+![JaCoCo coverage report showing 89.6% branch coverage](docs/images/coverage-report.png)
 
 API testing revealed **4 open bugs** that will be addressed: deleting a course
 that still has coursework or course sessions, and creating or moving a course
