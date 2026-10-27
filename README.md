@@ -124,12 +124,6 @@ Included third-party build scripts: `mvnw`, `mvnw.cmd`, and
 Tasks and individual contributions are tracked on our
 [Jira board](https://perihelion-4156.atlassian.net/jira/software/projects/KAN/boards/1).
 
-## AI assistance
-
-See [AI usage documentation](docs/ai-usage.md) for tools, purposes, available
-prompts, affected files, and token information. Some original prompts, totals,
-and file markings still need to be completed by the team.
-
 ## Submission status
 
 Before submission, complete the missing API tests, reports, and AI records;
