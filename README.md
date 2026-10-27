@@ -90,6 +90,7 @@ database, and the shared setup is in
   [checkstyle.xml](checkstyle.xml), including 80-character lines, Javadocs, naming,
   imports, and whitespace. These are the same rules we used for the MiniProject.
   The build checks production sources; test sources are excluded in the POM.
+  The Checkstyle report comes back clean.
 - **JaCoCo 0.8.15**: records coverage during tests and generates reports during
   `verify`. No minimum-coverage enforcement is configured.
 - **GitHub Actions**: [ci.yml](.github/workflows/ci.yml) runs Checkstyle and Maven
@@ -104,6 +105,8 @@ database, and the shared setup is in
 
 The minimum required branch coverage is 55%; the current test suite reaches
 **100% branch coverage**.
+
+![JaCoCo coverage report showing 100% branch coverage](docs/images/coverage-report.png)
 
 API testing revealed **4 open bugs** that will be addressed: deleting a course
 that still has coursework or course sessions, and creating or moving a course
@@ -128,3 +131,8 @@ Included third-party build scripts: `mvnw`, `mvnw.cmd`, and
 
 Tasks and individual contributions are tracked on our
 [Jira board](https://perihelion-4156.atlassian.net/jira/software/projects/KAN/boards/1).
+
+## AI Usage
+
+AI was used for the development of this project. We track the model and number
+of tokens at the top of files generated with the help of AI.
