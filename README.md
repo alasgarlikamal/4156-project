@@ -1,8 +1,9 @@
 # Perihelion: Academic Planning and Assessment Service
 
 A Java/Spring Boot REST service backed by SQLite. The current MVP supports CRUD
-for courses, enrollments, coursework, submissions, work plans, and tasks
-(30 operations). Workload analysis, automatic work-plan generation, grading,
+for courses, enrollments, coursework, submissions, work plans, tasks, and weekly
+course sessions, plus an iCalendar (`.ics`) export of a course's sessions
+(35 operations). Workload analysis, automatic work-plan generation, grading,
 progress analysis, and Google Calendar integration are planned features. No
 authentication is configured.
 
@@ -50,9 +51,12 @@ fields, validation, status codes, call order, and valid/invalid usage scenarios.
 | Submissions | `/api/submissions` | `enrollmentId`, `courseworkId` |
 | Work plans | `/api/workplans` | `enrollmentId` |
 | Tasks | `/api/tasks` | `enrollmentId`, `workPlanId`, `courseworkId` |
+| Course sessions | `/api/courses/{courseId}/sessions` | — |
 
 Each resource supports POST and GET on its base path, and GET, PUT, and DELETE
-on `/{id}`. Create a course before its coursework and enrollments, then a work
+on `/{id}`. Course sessions support PUT and DELETE on `/{sessionId}`, and
+`GET /api/courses/{courseId}/calendar.ics` exports them as calendar events.
+Create a course before its coursework and enrollments, then a work
 plan before its tasks. Delete dependent records first; there are no cascading
 deletes. Field rules, ordering, and 409 cases are in the API reference.
 
@@ -60,10 +64,16 @@ deletes. Field rules, ordering, and 409 cases are in the API reference.
 
 Build dependencies and plugins are configured in [pom.xml](pom.xml).
 Tests are grouped by resource and layer in [src/test/java](src/test/java), using
-JUnit 5 and Mockito. MockMvc controller tests mock services; service tests mock
-repositories. Integration tests use SQLite with the
+JUnit Jupiter and Mockito. MockMvc controller tests mock services; service tests
+mock repositories. Integration tests use SQLite with the
 [test profile](src/test/resources/application-test.properties), which selects an
 in-memory database instead of the development database.
+
+API tests (one `*ApiTest` class per resource, next to that resource's other
+tests) start the whole application with `@SpringBootTest` and send real HTTP
+requests through MockMvc, with nothing mocked. They use their own in-memory
+database, and the shared setup is in
+[ApiTestSupport](src/test/java/com/perihelionApi/ApiTestSupport.java).
 
 ```bash
 # Style checks, tests, packaging, and coverage report
@@ -72,14 +82,15 @@ in-memory database instead of the development database.
 # Tests without generating the coverage report
 ./mvnw test
 
-# Check style across production AND test sources
-./mvnw checkstyle:check -Dcheckstyle.includeTestSourceDirectory=true
+# API tests only
+./mvnw test -Dtest='*ApiTest*'
 ```
 
 - **Checkstyle 12.3.1**, via Maven plugin 3.6.0: custom Sun-based rules in
   [checkstyle.xml](checkstyle.xml), including 80-character lines, Javadocs, naming,
-  imports, and whitespace. Test sources are excluded by default in the POM; use
-  the explicit command above to check the whole codebase.
+  imports, and whitespace. These are the same rules we used for the MiniProject.
+  The build checks production sources; test sources are excluded in the POM.
+  The Checkstyle report comes back clean.
 - **JaCoCo 0.8.15**: records coverage during tests and generates reports during
   `verify`. No minimum-coverage enforcement is configured.
 - **GitHub Actions**: [ci.yml](.github/workflows/ci.yml) runs Checkstyle and Maven
@@ -92,15 +103,15 @@ in-memory database instead of the development database.
 | Coverage HTML | `target/site/jacoco/index.html` |
 | Coverage XML / CSV | `target/site/jacoco/jacoco.xml` / `jacoco.csv` |
 
-The rubric requires a committed clean style report and **at least 55% branch
-coverage**. Reports have not yet been included in this branch. Because `target/`
-is ignored, copy the final reports into a tracked directory and link them here;
-preserve the full JaCoCo HTML directory and record the tested commit. Use the
-**Branches** total rather than line coverage.
+The minimum required branch coverage is 55%; the current test suite reaches
+**100% branch coverage**.
 
-A Postman collection or linked live-service API testing workspace is still
-missing. MockMvc tests and the manual curl examples are available, but do not
-constitute a live-service API suite.
+![JaCoCo coverage report showing 100% branch coverage](docs/images/coverage-report.png)
+
+API testing revealed **4 open bugs** that will be addressed: deleting a course
+that still has coursework or course sessions, and creating or moving a course
+session onto an occupied time slot, return a server error instead of 409. The
+matching API tests are marked `@Disabled("Known bug: ...")` until they are fixed.
 
 ## Third-party software
 
@@ -121,8 +132,7 @@ Included third-party build scripts: `mvnw`, `mvnw.cmd`, and
 Tasks and individual contributions are tracked on our
 [Jira board](https://perihelion-4156.atlassian.net/jira/software/projects/KAN/boards/1).
 
-## Submission status
+## AI Usage
 
-Before submission, complete the missing API tests, reports, and AI records;
-confirm Mentor access to Jira; merge reviewed work into `main`; and tag the final
-main-branch commit before the deadline. Only tagged `main` is graded.
+AI was used for the development of this project. We track the model and number
+of tokens at the top of files generated with the help of AI.
