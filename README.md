@@ -1,57 +1,128 @@
-# 4156-project
+# Perihelion: Academic Planning and Assessment Service
 
-## Assignments API
+A Java/Spring Boot REST service backed by SQLite. The current MVP supports CRUD
+for courses, enrollments, coursework, submissions, work plans, and tasks
+(30 operations). Workload analysis, automatic work-plan generation, grading,
+progress analysis, and Google Calendar integration are planned features. No
+authentication is configured.
 
-Assignments belong to an existing course. The API follows the course and
-enrollment CRUD layout, with request/response records and a service/repository
-layer.
+## Team
 
-| Method | Endpoint | Result |
+| Member | UNI |
+| --- | --- |
+| Giana Castro | gmc2196 |
+| Daniel Keinan | dk3425 |
+| Yabby Maelaf | ym3013 |
+| Kamal Alasgarli | ka3088 |
+| Wanting You | wy2470 |
+| Ryan Shi | rs4669 |
+
+## Build and run
+
+Requires **JDK 21** and internet access for the initial dependency download. Maven
+is provided through the wrapper. Run from the repository root; on Windows, use
+`mvnw.cmd` instead of `./mvnw`.
+
+```bash
+mkdir -p data
+./mvnw clean verify
+./mvnw spring-boot:run
+```
+
+The service runs at `http://localhost:8080`; stop it with Ctrl+C. After building,
+you can also run `java -jar target/project-0.0.1-SNAPSHOT.jar`.
+
+Development data persists in `data/perihelion.db` across restarts. Startup runs
+[schema.sql](src/main/resources/schema.sql) and Hibernate schema updates.
+Database and connection settings are in
+[application.properties](src/main/resources/application.properties).
+
+## API documentation
+
+See the **[API reference and usage examples](docs/api.md)** for endpoint
+fields, validation, status codes, call order, and valid/invalid usage scenarios.
+
+| Resource | Base path | List filters |
 | --- | --- | --- |
-| POST | `/api/assignments` | Create an assignment (201) |
-| GET | `/api/assignments?courseId=1` | List assignments; course filter is optional |
-| GET | `/api/assignments/{id}` | Retrieve an assignment |
-| PUT | `/api/assignments/{id}` | Replace all assignment values |
-| DELETE | `/api/assignments/{id}` | Delete an assignment (204) |
+| Courses | `/api/courses` | `title`, `code` |
+| Enrollments | `/api/enrollments` | `courseId`, `learnerRef` |
+| Coursework | `/api/coursework` | `courseId`, `kind` (`EXAM` or `ASSIGNMENT`) |
+| Submissions | `/api/submissions` | `enrollmentId`, `courseworkId` |
+| Work plans | `/api/workplans` | `enrollmentId` |
+| Tasks | `/api/tasks` | `enrollmentId`, `workPlanId`, `courseworkId` |
 
-Example create or replace body:
+Each resource supports POST and GET on its base path, and GET, PUT, and DELETE
+on `/{id}`. Create a course before its coursework and enrollments, then a work
+plan before its tasks. Delete dependent records first; there are no cascading
+deletes. Field rules, ordering, and 409 cases are in the API reference.
 
-```json
-{
-  "courseId": 1,
-  "title": "Project proposal",
-  "dueDate": "2026-11-01",
-  "estimatedWorkHours": 4.5
-}
+## Tests and code quality
+
+Build dependencies and plugins are configured in [pom.xml](pom.xml).
+Tests are grouped by resource and layer in [src/test/java](src/test/java), using
+JUnit 5 and Mockito. MockMvc controller tests mock services; service tests mock
+repositories. Integration tests use SQLite with the
+[test profile](src/test/resources/application-test.properties), which selects an
+in-memory database instead of the development database.
+
+```bash
+# Style checks, tests, packaging, and coverage report
+./mvnw clean verify
+
+# Tests without generating the coverage report
+./mvnw test
+
+# Check style across production AND test sources
+./mvnw checkstyle:check -Dcheckstyle.includeTestSourceDirectory=true
 ```
 
-All fields are required. Titles must contain text and be at most 255 characters;
-course IDs must be positive; estimated hours must be nonnegative. Past deadlines
-are allowed so clients can store historical assignments. Lists are ordered by
-due date, then ID. Responses include the generated `id` plus the request fields.
-Invalid requests return 400; missing assignments or referenced courses return
-404. Course deletion is blocked by the database while assignments reference it,
-returning 409 through the shared exception handler.
+- **Checkstyle 12.3.1**, via Maven plugin 3.6.0: custom Sun-based rules in
+  [checkstyle.xml](checkstyle.xml), including 80-character lines, Javadocs, naming,
+  imports, and whitespace. Test sources are excluded by default in the POM; use
+  the explicit command above to check the whole codebase.
+- **JaCoCo 0.8.15**: records coverage during tests and generates reports during
+  `verify`. No minimum-coverage enforcement is configured.
+- **GitHub Actions**: [ci.yml](.github/workflows/ci.yml) runs Checkstyle and Maven
+  verification on pushes and pull requests.
 
-Run tests and Checkstyle with `./mvnw test`. Assignment tests include MockMvc
-controller tests, Mockito service tests, and an in-memory SQLite CRUD test.
+| Report | Generated location |
+| --- | --- |
+| Test results (Surefire) | `target/surefire-reports/` |
+| Style findings | `target/checkstyle-result.xml` and console output |
+| Coverage HTML | `target/site/jacoco/index.html` |
+| Coverage XML / CSV | `target/site/jacoco/jacoco.xml` / `jacoco.csv` |
 
-## Course sessions and calendar export
+The rubric requires a committed clean style report and **at least 55% branch
+coverage**. Reports have not yet been included in this branch. Because `target/`
+is ignored, copy the final reports into a tracked directory and link them here;
+preserve the full JaCoCo HTML directory and record the tested commit. Use the
+**Branches** total rather than line coverage.
 
-Weekly course meetings belong to a course and use ISO weekday numbers
-(Monday = 1 through Sunday = 7). Times use `HH:mm` local time in
-`America/New_York`. Create and manage sessions at
-`/api/courses/{courseId}/sessions`; download all occurrences between the
-course's inclusive term dates from `/api/courses/{courseId}/calendar.ics`.
-The calendar export expands each weekly session to dated events and encodes
-the resulting instants in UTC.
+A Postman collection or linked live-service API testing workspace is still
+missing. MockMvc tests and the manual curl examples are available, but do not
+constitute a live-service API suite.
 
-Example session body:
+## Third-party software
 
-```json
-{
-  "weekday": 1,
-  "startTime": "14:00",
-  "endTime": "15:15"
-}
-```
+Application and testing libraries are downloaded through Maven; dependency
+versions are declared or managed through [pom.xml](pom.xml). Run
+`./mvnw dependency:tree` for the resolved list. These include Spring Boot,
+Hibernate, SQLite JDBC, JUnit, and Mockito, plus Checkstyle and JaCoCo plugins.
+No other vendored third-party application code was identified during this review.
+
+Included third-party build scripts: `mvnw`, `mvnw.cmd`, and
+`.mvn/wrapper/maven-wrapper.properties` come from
+[Apache Maven Wrapper](https://github.com/apache/maven-wrapper).
+[checkstyle.xml](checkstyle.xml) is a custom configuration based on Checkstyle's
+[Sun ruleset](https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/sun_checks.xml).
+
+## Project management
+
+Tasks and individual contributions are tracked on our
+[Jira board](https://perihelion-4156.atlassian.net/jira/software/projects/KAN/boards/1).
+
+## Submission status
+
+Before submission, complete the missing API tests, reports, and AI records;
+confirm Mentor access to Jira; merge reviewed work into `main`; and tag the final
+main-branch commit before the deadline. Only tagged `main` is graded.
