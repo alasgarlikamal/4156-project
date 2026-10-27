@@ -1,3 +1,4 @@
+// Wrote file with github copilot used 7.5 credits
 package com.perihelionApi.coursesession;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -75,6 +76,25 @@ class CourseSessionControllerTest {
                 .andExpect(content().string(
                         org.hamcrest.Matchers.containsString(
                                 "endTime must be later than startTime")));
+
+        verify(sessionService, never()).create(any(), any());
+    }
+
+    @Test
+    void createRejectsMissingStartOrEndTime() throws Exception {
+        mockMvc.perform(post("/api/courses/1/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"weekday":1,"endTime":"15:15"}
+                        """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/courses/1/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"weekday":1,"startTime":"14:00"}
+                        """))
+                .andExpect(status().isBadRequest());
 
         verify(sessionService, never()).create(any(), any());
     }

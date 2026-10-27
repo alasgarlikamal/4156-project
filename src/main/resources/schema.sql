@@ -1,3 +1,4 @@
+-- Added course session table with github copilot, used 6 credits
 -- The SQLite Hibernate dialect cannot add foreign keys or composite unique keys.
 CREATE TABLE IF NOT EXISTS course (
     id integer,

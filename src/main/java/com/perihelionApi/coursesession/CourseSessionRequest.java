@@ -1,3 +1,4 @@
+// Wrote file with github copilot used 6 credits
 package com.perihelionApi.coursesession;
 
 import java.time.LocalTime;

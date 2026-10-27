@@ -1,3 +1,4 @@
+// Wrote file with github copilot used 7.5 credits
 package com.perihelionApi.coursesession;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -59,6 +60,24 @@ class CourseSessionIntegrationTest {
         assertEquals(List.of(updated), sessionService.list(courseId));
         assertThrows(NotFoundException.class,
                 () -> sessionService.delete(courseId, earlier.id()));
+    }
+
+    @Test
+    void rejectsUpdatingSessionOwnedByAnotherCourse() {
+        Long ownerCourseId = courseService.create(new CourseRequest(
+                "COMS W4156", "Software Engineering",
+                LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 9))).id();
+        Long otherCourseId = courseService.create(new CourseRequest(
+                "COMS W4111", "Database Systems",
+                LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 9))).id();
+        CourseSessionResponse session = sessionService.create(ownerCourseId,
+                new CourseSessionRequest(1, LocalTime.of(14, 0),
+                        LocalTime.of(15, 0)));
+
+        assertThrows(NotFoundException.class,
+                () -> sessionService.update(otherCourseId, session.id(),
+                        new CourseSessionRequest(2, LocalTime.of(14, 0),
+                                LocalTime.of(15, 0))));
     }
 
     private static int count(final String text, final String substring) {

@@ -1,3 +1,4 @@
+// Wrote file with github copilot used 7.5 credits
 package com.perihelionApi.coursesession;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +31,37 @@ class CourseCalendarExporterTest {
         assertTrue(calendar.contains("SUMMARY:COMS W4156 - "
                 + "Software\\, Design"));
         assertTrue(calendar.endsWith("END:VCALENDAR\r\n"));
+        for (String line : calendar.split("\r\n")) {
+            assertTrue(line.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                    .length <= 75);
+        }
+    }
+
+    @Test
+    void omitsNullAndBlankCourseCodes() {
+        Course withoutCode = course(null, "Software Design");
+        Course withBlankCode = course("  ", "Software Design");
+        CourseSession session = session(1L, 1, "14:00", "15:15");
+
+        String nullCodeCalendar = CourseCalendarExporter.export(withoutCode,
+                List.of(session));
+        String blankCodeCalendar = CourseCalendarExporter.export(withBlankCode,
+                List.of(session));
+
+        assertTrue(nullCodeCalendar.contains("SUMMARY:Software Design"));
+        assertTrue(blankCodeCalendar.contains("SUMMARY:Software Design"));
+    }
+
+    @Test
+    void foldsLongCalendarLines() {
+        String longTitle = "A".repeat(80);
+        String calendar = CourseCalendarExporter.export(
+                course(null, longTitle),
+                List.of(session(1L, 1, "14:00", "15:15")));
+
+        assertTrue(calendar.contains("\r\n "));
+        assertTrue(calendar.replace("\r\n ", "")
+                .contains("SUMMARY:" + longTitle));
         for (String line : calendar.split("\r\n")) {
             assertTrue(line.getBytes(java.nio.charset.StandardCharsets.UTF_8)
                     .length <= 75);
