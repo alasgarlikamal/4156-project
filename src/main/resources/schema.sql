@@ -71,3 +71,19 @@ CREATE TABLE IF NOT EXISTS submission (
 
 CREATE INDEX IF NOT EXISTS submission_enrollment_idx
     ON submission (enrollment_id);
+
+CREATE TABLE IF NOT EXISTS work_plan (
+    id integer,
+    enrollment_id bigint not null,
+    range_start date not null,
+    range_end date not null,
+    available_hours_per_day numeric not null,
+    created_at timestamp not null,
+    primary key (id),
+    constraint work_plan_range_ck check (range_end > range_start),
+    constraint fk_work_plan_enrollment
+        foreign key (enrollment_id) references enrollment (id)
+);
+
+CREATE INDEX IF NOT EXISTS work_plan_enrollment_idx
+    ON work_plan (enrollment_id);
