@@ -25,6 +25,7 @@ import com.perihelionApi.common.NotFoundException;
 import com.perihelionApi.course.Course;
 import com.perihelionApi.course.CourseRepository;
 import com.perihelionApi.submission.SubmissionRepository;
+import com.perihelionApi.workplan.WorkPlanRepository;
 
 @ExtendWith(MockitoExtension.class)
 class EnrollmentServiceTest {
@@ -39,6 +40,9 @@ class EnrollmentServiceTest {
 
 	@Mock
 	private SubmissionRepository submissionRepository;
+
+	@Mock
+	private WorkPlanRepository workPlanRepository;
 
 	@InjectMocks
 	private EnrollmentService enrollmentService;
@@ -95,6 +99,29 @@ class EnrollmentServiceTest {
 
 		assertEquals("Enrollment cannot be deleted while submissions exist", exception.getMessage());
 		verify(enrollmentRepository, never()).deleteById(any());
+	}
+
+	@Test
+	void deleteRejectsEnrollmentWithWorkPlans() {
+		when(enrollmentRepository.existsById(8L)).thenReturn(true);
+		when(submissionRepository.existsByEnrollmentId(8L)).thenReturn(false);
+		when(workPlanRepository.existsByEnrollmentId(8L)).thenReturn(true);
+
+		ConflictException exception = assertThrows(ConflictException.class, () -> enrollmentService.delete(8L));
+
+		assertEquals("Enrollment cannot be deleted while work plans exist", exception.getMessage());
+		verify(enrollmentRepository, never()).deleteById(any());
+	}
+
+	@Test
+	void deleteRemovesEnrollmentWithoutDependents() {
+		when(enrollmentRepository.existsById(8L)).thenReturn(true);
+		when(submissionRepository.existsByEnrollmentId(8L)).thenReturn(false);
+		when(workPlanRepository.existsByEnrollmentId(8L)).thenReturn(false);
+
+		enrollmentService.delete(8L);
+
+		verify(enrollmentRepository).deleteById(8L);
 	}
 
 	private static Course course(Long id) {

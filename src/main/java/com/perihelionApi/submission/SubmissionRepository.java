@@ -1,3 +1,6 @@
+/*
+    AI usage: Submission coursework link: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import java.util.List;
@@ -16,6 +19,14 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
      * @return true if at least one submission exists for the enrollment
      */
     boolean existsByEnrollmentId(Long enrollmentId);
+
+    /**
+     * Reports whether any submission references the given coursework.
+     *
+     * @param courseworkId the coursework id
+     * @return true if at least one submission exists for the coursework
+     */
+    boolean existsByCourseworkId(Long courseworkId);
 
     /**
      * Reports whether an enrollment has already submitted a coursework.

@@ -14,6 +14,7 @@ import com.perihelionApi.common.NotFoundException;
 import com.perihelionApi.course.Course;
 import com.perihelionApi.course.CourseRepository;
 import com.perihelionApi.submission.SubmissionRepository;
+import com.perihelionApi.workplan.WorkPlanRepository;
 
 /**
  * Business logic for enrollments.
@@ -31,19 +32,25 @@ public class EnrollmentService {
     /** Persistence for submissions, used to guard deletes. */
     private final SubmissionRepository submissionRepository;
 
+    /** Persistence for work plans, used to guard deletes. */
+    private final WorkPlanRepository workPlanRepository;
+
     /**
      * Creates the service.
      *
      * @param enrollmentRepository the enrollment repository
      * @param courseRepository     the course repository
      * @param submissionRepository the submission repository
+     * @param workPlanRepository   the work plan repository
      */
     public EnrollmentService(final EnrollmentRepository enrollmentRepository,
             final CourseRepository courseRepository,
-            final SubmissionRepository submissionRepository) {
+            final SubmissionRepository submissionRepository,
+            final WorkPlanRepository workPlanRepository) {
         this.enrollmentRepository = enrollmentRepository;
         this.courseRepository = courseRepository;
         this.submissionRepository = submissionRepository;
+        this.workPlanRepository = workPlanRepository;
     }
 
     /**
@@ -137,7 +144,8 @@ public class EnrollmentService {
      *
      * @param id the enrollment id
      * @throws NotFoundException if no enrollment has the given id
-     * @throws ConflictException if the enrollment has submissions
+     * @throws ConflictException if the enrollment has submissions or work
+     *                           plans
      */
     public void delete(final Long id) {
         if (!enrollmentRepository.existsById(id)) {
@@ -146,6 +154,10 @@ public class EnrollmentService {
         if (submissionRepository.existsByEnrollmentId(id)) {
             throw new ConflictException(
                     "Enrollment cannot be deleted while submissions exist");
+        }
+        if (workPlanRepository.existsByEnrollmentId(id)) {
+            throw new ConflictException(
+                    "Enrollment cannot be deleted while work plans exist");
         }
         enrollmentRepository.deleteById(id);
     }
