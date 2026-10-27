@@ -1,3 +1,6 @@
+/*
+	AI usage: Submission tests: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.submission;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -77,6 +80,27 @@ class SubmissionControllerTest {
 		mockMvc.perform(post("/api/submissions").contentType(MediaType.APPLICATION_JSON).content("""
 				{"enrollmentId":9,"courseworkId":3}
 				""")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Enrollment not found"));
+	}
+
+	@Test
+	void createReturnsNotFoundWhenCourseworkIsMissing() throws Exception {
+		when(submissionService.create(any(SubmissionRequest.class)))
+				.thenThrow(new NotFoundException("Coursework not found"));
+
+		mockMvc.perform(post("/api/submissions").contentType(MediaType.APPLICATION_JSON).content("""
+				{"enrollmentId":4,"courseworkId":99}
+				""")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Coursework not found"));
+	}
+
+	@Test
+	void createReturnsConflictForCourseworkFromAnotherCourse() throws Exception {
+		when(submissionService.create(any(SubmissionRequest.class)))
+				.thenThrow(new ConflictException("Coursework must belong to the enrollment's course"));
+
+		mockMvc.perform(post("/api/submissions").contentType(MediaType.APPLICATION_JSON).content("""
+				{"enrollmentId":4,"courseworkId":3}
+				""")).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.message").value("Coursework must belong to the enrollment's course"));
 	}
 
 	@Test
