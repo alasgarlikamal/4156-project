@@ -1,179 +1,194 @@
+/*
+    AI usage: Task CRUD: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.task;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+import com.perihelionApi.coursework.Coursework;
+import com.perihelionApi.enrollment.Enrollment;
+import com.perihelionApi.workplan.WorkPlan;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDate;
 
 /**
- * Represents a task associated with a work plan, coursework, and enrollment.
+ * A unit of planned work inside a work plan, aimed at one piece of
+ * coursework.
  */
 @Entity
-@Table(name = "Task")
+@Table(name = "task",
+        indexes = {
+            @Index(name = "task_work_plan_idx", columnList = "work_plan_id"),
+            @Index(name = "task_enrollment_idx",
+                    columnList = "enrollment_id") })
 public class Task {
 
-    /** Unique identifier for the task. */
+    /** Surrogate primary key. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
-    /** Identifier of the work plan associated with this task. */
-    @Column(name = "workplanId")
-    private Integer workplanId;
+    /** The work plan this task belongs to. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_plan_id", nullable = false)
+    private WorkPlan workPlan;
 
-    /** Identifier of the coursework associated with this task. */
-    @Column(name = "courseworkId")
-    private Integer courseworkId;
+    /** The coursework this task works toward. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "coursework_id", nullable = false)
+    private Coursework coursework;
 
-    /** Identifier of the enrollment associated with this task. */
-    @Column(name = "enrollmentId")
-    private Integer enrollmentId;
+    /** The enrollment that owns this task. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "enrollment_id", nullable = false)
+    private Enrollment enrollment;
 
-    /** Title describing the task. */
-    @Column(name = "title")
+    /** Short description of the task. */
+    @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    /** Target completion date for the task. */
-    @Column(name = "targetDate")
+    /** Day the task should be finished. */
+    @Column(name = "target_date", nullable = false)
     private LocalDate targetDate;
 
-    /** Estimated number of hours needed to complete the task. */
-    @Column(name = "estimatedWorkHours")
-    private Float estimatedWorkHours;
+    /** Estimated effort in hours. */
+    @Column(name = "estimated_work_hours", nullable = false)
+    private BigDecimal estimatedWorkHours;
 
     /**
-     * Creates an empty task for JPA.
-     */
-    protected Task() {
-        // Required by JPA.
-    }
-
-    /**
-     * Returns the task identifier.
+     * Returns the primary key.
      *
-     * @return the task identifier
+     * @return the id, or null if not yet persisted
      */
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
     /**
-     * Sets the task identifier.
+     * Sets the primary key.
      *
-     * @param newId the task identifier
+     * @param id the id
      */
-    public void setId(final Integer newId) {
-        this.id = newId;
+    public void setId(final Long id) {
+        this.id = id;
     }
 
     /**
-     * Returns the associated work plan identifier.
+     * Returns the owning work plan.
      *
-     * @return the work plan identifier
+     * @return the work plan
      */
-    public Integer getWorkplanId() {
-        return workplanId;
+    public WorkPlan getWorkPlan() {
+        return workPlan;
     }
 
     /**
-     * Sets the associated work plan identifier.
+     * Sets the owning work plan.
      *
-     * @param newWorkplanId the work plan identifier
+     * @param workPlan the work plan
      */
-    public void setWorkplanId(final Integer newWorkplanId) {
-        this.workplanId = newWorkplanId;
+    public void setWorkPlan(final WorkPlan workPlan) {
+        this.workPlan = workPlan;
     }
 
     /**
-     * Returns the associated coursework identifier.
+     * Returns the targeted coursework.
      *
-     * @return the coursework identifier
+     * @return the coursework
      */
-    public Integer getCourseworkId() {
-        return courseworkId;
+    public Coursework getCoursework() {
+        return coursework;
     }
 
     /**
-     * Sets the associated coursework identifier.
+     * Sets the targeted coursework.
      *
-     * @param newCourseworkId the coursework identifier
+     * @param coursework the coursework
      */
-    public void setCourseworkId(final Integer newCourseworkId) {
-        this.courseworkId = newCourseworkId;
+    public void setCoursework(final Coursework coursework) {
+        this.coursework = coursework;
     }
 
     /**
-     * Returns the associated enrollment identifier.
+     * Returns the owning enrollment.
      *
-     * @return the enrollment identifier
+     * @return the enrollment
      */
-    public Integer getEnrollmentId() {
-        return enrollmentId;
+    public Enrollment getEnrollment() {
+        return enrollment;
     }
 
     /**
-     * Sets the associated enrollment identifier.
+     * Sets the owning enrollment.
      *
-     * @param newEnrollmentId the enrollment identifier
+     * @param enrollment the enrollment
      */
-    public void setEnrollmentId(final Integer newEnrollmentId) {
-        this.enrollmentId = newEnrollmentId;
+    public void setEnrollment(final Enrollment enrollment) {
+        this.enrollment = enrollment;
     }
 
     /**
-     * Returns the task title.
+     * Returns the title.
      *
-     * @return the task title
+     * @return the title
      */
     public String getTitle() {
         return title;
     }
 
     /**
-     * Sets the task title.
+     * Sets the title.
      *
-     * @param newTitle the task title
+     * @param title the title
      */
-    public void setTitle(final String newTitle) {
-        this.title = newTitle;
+    public void setTitle(final String title) {
+        this.title = title;
     }
 
     /**
-     * Returns the target completion date.
+     * Returns the target date.
      *
-     * @return the target completion date
+     * @return the target date
      */
     public LocalDate getTargetDate() {
         return targetDate;
     }
 
     /**
-     * Sets the target completion date.
+     * Sets the target date.
      *
-     * @param newTargetDate the target completion date
+     * @param targetDate the target date
      */
-    public void setTargetDate(final LocalDate newTargetDate) {
-        this.targetDate = newTargetDate;
+    public void setTargetDate(final LocalDate targetDate) {
+        this.targetDate = targetDate;
     }
 
     /**
-     * Returns the estimated work hours.
+     * Returns the estimated effort in hours.
      *
      * @return the estimated work hours
      */
-    public Float getEstimatedWorkHours() {
+    public BigDecimal getEstimatedWorkHours() {
         return estimatedWorkHours;
     }
 
     /**
-     * Sets the estimated work hours.
+     * Sets the estimated effort in hours.
      *
-     * @param newEstimatedWorkHours the estimated work hours
+     * @param estimatedWorkHours the estimated work hours
      */
-    public void setEstimatedWorkHours(final Float newEstimatedWorkHours) {
-        this.estimatedWorkHours = newEstimatedWorkHours;
+    public void setEstimatedWorkHours(final BigDecimal estimatedWorkHours) {
+        this.estimatedWorkHours = estimatedWorkHours;
     }
+
 }

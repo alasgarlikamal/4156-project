@@ -79,3 +79,23 @@ CREATE TABLE IF NOT EXISTS work_plan (
 
 CREATE INDEX IF NOT EXISTS work_plan_enrollment_idx
     ON work_plan (enrollment_id);
+
+CREATE TABLE IF NOT EXISTS task (
+    id integer,
+    work_plan_id bigint not null,
+    coursework_id bigint not null,
+    enrollment_id bigint not null,
+    title varchar(255) not null,
+    target_date date not null,
+    estimated_work_hours numeric not null,
+    primary key (id),
+    constraint fk_task_work_plan
+        foreign key (work_plan_id) references work_plan (id),
+    constraint fk_task_coursework
+        foreign key (coursework_id) references coursework (id),
+    constraint fk_task_enrollment
+        foreign key (enrollment_id) references enrollment (id)
+);
+
+CREATE INDEX IF NOT EXISTS task_work_plan_idx ON task (work_plan_id);
+CREATE INDEX IF NOT EXISTS task_enrollment_idx ON task (enrollment_id);

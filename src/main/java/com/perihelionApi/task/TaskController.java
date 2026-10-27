@@ -1,6 +1,10 @@
+/*
+    AI usage: Task CRUD: Grok 4.7, ~238K tokens
+ */
 package com.perihelionApi.task;
 
 import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,102 +17,90 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 /**
- * Handles HTTP requests for task operations.
+ * REST endpoints for creating, reading, updating, and deleting tasks.
  */
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
 
-    /** Service used to manage tasks. */
+    /** Business logic for tasks. */
     private final TaskService taskService;
 
     /**
-     * Creates a task controller.
+     * Creates the controller.
      *
-     * @param service service used to manage tasks
+     * @param taskService the task service
      */
-    public TaskController(final TaskService service) {
-        this.taskService = service;
+    public TaskController(final TaskService taskService) {
+        this.taskService = taskService;
     }
 
     /**
      * Creates a task.
      *
-     * @param task the task to create
-     * @return the created task with HTTP status 201
+     * @param request the task to create
+     * @return a 201 response with the created task
      */
     @PostMapping
-    public ResponseEntity<Task> createTask(@RequestBody final Task task) {
-        Task createdTask = taskService.createTask(task);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdTask);
+    public ResponseEntity<TaskResponse> create(
+            @Valid @RequestBody final TaskRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(taskService.create(request));
     }
 
     /**
-     * Retrieves tasks, optionally filtered by related records.
+     * Lists tasks matching every supplied filter.
      *
-     * @param enrollmentId optional enrollment identifier
-     * @param workplanId optional work plan identifier
-     * @param courseworkId optional coursework identifier
-     * @return the matching tasks
+     * @param enrollmentId an enrollment id, or null
+     * @param workPlanId   a work plan id, or null
+     * @param courseworkId a coursework id, or null
+     * @return the matching tasks ordered by target date and id
      */
     @GetMapping
-    public ResponseEntity<List<Task>> getTasks(
-            @RequestParam(required = false) final Integer enrollmentId,
-            @RequestParam(required = false) final Integer workplanId,
-            @RequestParam(required = false) final Integer courseworkId) {
-
-        List<Task> tasks;
-
-        if (enrollmentId != null) {
-            tasks = taskService.getTasksByEnrollment(enrollmentId);
-        } else if (workplanId != null) {
-            tasks = taskService.getTasksByWorkplan(workplanId);
-        } else if (courseworkId != null) {
-            tasks = taskService.getTasksByCoursework(courseworkId);
-        } else {
-            tasks = taskService.getAllTasks();
-        }
-
-        return ResponseEntity.ok(tasks);
+    public List<TaskResponse> list(
+            @RequestParam(required = false) final Long enrollmentId,
+            @RequestParam(required = false) final Long workPlanId,
+            @RequestParam(required = false) final Long courseworkId) {
+        return taskService.list(enrollmentId, workPlanId, courseworkId);
     }
 
     /**
-     * Retrieves a task by its identifier.
+     * Returns a single task.
      *
-     * @param id the task identifier
-     * @return the requested task
+     * @param id the task id
+     * @return the task
      */
     @GetMapping("/{id}")
-    public ResponseEntity<Task> getTaskById(
-            @PathVariable("id") final Integer id) {
-        return ResponseEntity.ok(taskService.getTaskById(id));
+    public TaskResponse get(@PathVariable final Long id) {
+        return taskService.get(id);
     }
 
     /**
-     * Updates an existing task.
+     * Replaces a task.
      *
-     * @param id the task identifier
-     * @param task the updated task values
+     * @param id      the task id
+     * @param request the new task values
      * @return the updated task
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Task> updateTask(
-            @PathVariable("id") final Integer id,
-            @RequestBody final Task task) {
-        return ResponseEntity.ok(taskService.updateTask(id, task));
+    public TaskResponse update(@PathVariable final Long id,
+            @Valid @RequestBody final TaskRequest request) {
+        return taskService.update(id, request);
     }
 
     /**
-     * Deletes a task by its identifier.
+     * Deletes a task.
      *
-     * @param id the task identifier
-     * @return an empty response with HTTP status 204
+     * @param id the task id
+     * @return a 204 response
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTask(
-            @PathVariable("id") final Integer id) {
-        taskService.deleteTask(id);
+    public ResponseEntity<Void> delete(@PathVariable final Long id) {
+        taskService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
 }
