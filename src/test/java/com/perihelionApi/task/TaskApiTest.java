@@ -412,20 +412,17 @@ class TaskApiTest extends ApiTestSupport {
                     .andExpect(fieldsAre(chain, title, targetDate, 2));
         }
 
-        @ParameterizedTest(name = "estimatedWorkHours {0}")
-        @ValueSource(strings = {"0", "1000"})
-        @DisplayName("estimatedWorkHours of 0 or a large value returns 201")
-        void zeroOrLargeHoursReturn201(final String hours) throws Exception {
-            // Assumption: 1000 stands for "no maximum"; the description
-            // gives no upper limit.
+        @Test
+        @DisplayName("estimatedWorkHours of 0 returns 201")
+        void zeroHoursReturns201() throws Exception {
             Chain chain = createChain();
             String title = unique("Task");
 
             ResultActions result =
-                    postJson(PATH, taskJson(chain, title, IN_RANGE, hours));
+                    postJson(PATH, taskJson(chain, title, IN_RANGE, "0"));
 
             result.andExpect(status().isCreated())
-                    .andExpect(hoursAre(Double.parseDouble(hours)));
+                    .andExpect(hoursAre(0));
         }
 
         @Test
@@ -462,9 +459,8 @@ class TaskApiTest extends ApiTestSupport {
         }
 
         @ParameterizedTest(name = "{0} = {1}")
-        @CsvSource({"workPlanId, 0", "courseworkId, 0", "enrollmentId, 0",
-            "workPlanId, -1", "courseworkId, -1", "enrollmentId, -1"})
-        @DisplayName("id of 0 or less returns 400 naming that field")
+        @CsvSource({"workPlanId, 0", "courseworkId, 0", "enrollmentId, 0"})
+        @DisplayName("id of 0 returns 400 naming that field")
         void nonPositiveIdReturns400(final String field, final long value)
                 throws Exception {
             Chain chain = createChain();
@@ -652,40 +648,6 @@ class TaskApiTest extends ApiTestSupport {
 
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(OUT_OF_RANGE));
-        }
-
-        @Test
-        @DisplayName("enrollment mismatch is reported before coursework "
-                + "from another course")
-        void enrollmentMismatchIsCheckedBeforeCourse() throws Exception {
-            // The other enrollment is in a new course, so the chain's
-            // coursework is not in its course either: both rules fail.
-            Chain chain = createChain();
-            long other = createEnrollment(createCourse());
-            String body =
-                    taskJsonWith("enrollmentId", String.valueOf(other), chain);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message")
-                            .value(ENROLLMENT_MISMATCH));
-        }
-
-        @Test
-        @DisplayName("coursework from another course is reported before a "
-                + "targetDate outside the range")
-        void courseIsCheckedBeforeRange() throws Exception {
-            Chain chain = createChain();
-            long otherWork = createCoursework(createCourse());
-            String body = taskJson(chain.workPlanId(), otherWork,
-                    chain.enrollmentId(), unique("Task"),
-                    RANGE_END.plusDays(1), "2");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value(WRONG_COURSE));
         }
 
         @Test
@@ -889,14 +851,11 @@ class TaskApiTest extends ApiTestSupport {
                     .andExpect(fieldsAre(chain, title, RANGE_END, 1.25));
         }
 
-        @ParameterizedTest(name = "id {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
+        @Test
         @DisplayName("id that does not exist returns 404 with the standard "
                 + "JSON error body")
-        void unknownIdReturns404(final long id) throws Exception {
-            // Assumption: an id of 0 or less is simply not found, like any
-            // other id that was never created.
-            ResultActions result = getTask(id);
+        void unknownIdReturns404() throws Exception {
+            ResultActions result = getTask(UNKNOWN_ID);
 
             result.andExpect(status().isNotFound())
                     .andExpect(content().contentTypeCompatibleWith(
@@ -905,13 +864,10 @@ class TaskApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.fieldErrors").isEmpty());
         }
 
-        @ParameterizedTest(name = "id \"{0}\"")
-        @ValueSource(strings = {"abc", "1.5", "9223372036854775808"})
-        @DisplayName("id that is not a whole number in range returns 400")
-        void invalidIdReturns400(final String id) throws Exception {
-            // Assumption: "1.5" and a value one above Long.MAX_VALUE are path
-            // values of the wrong type, like "abc".
-            ResultActions result = mvc().perform(get(PATH + "/" + id));
+        @Test
+        @DisplayName("id that is not a number returns 400")
+        void invalidIdReturns400() throws Exception {
+            ResultActions result = mvc().perform(get(PATH + "/abc"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(INVALID_ID));

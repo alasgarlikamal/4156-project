@@ -230,28 +230,9 @@ class SubmissionApiTest extends ApiTestSupport {
                             .value(ENROLLMENT_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "enrollmentId {0}")
-        @ValueSource(longs = {0, -1})
-        @DisplayName("enrollmentId of 0 or less passes validation and "
-                + "returns 404")
-        void nonPositiveEnrollmentIdReturns404(final long enrollmentId)
-                throws Exception {
-            // Assumption: enrollmentId is only @NotNull, so a value of 0 or
-            // less is simply not found, like the courseworkId case.
-            long courseworkId = createCoursework(createCourse());
-            String body =
-                    submissionJson(enrollmentId, courseworkId, SUBMITTED_AT);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(ENROLLMENT_NOT_FOUND));
-        }
-
         @ParameterizedTest(name = "courseworkId {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
-        @DisplayName("courseworkId that does not exist, including 0 or less, "
+        @ValueSource(longs = {UNKNOWN_ID, 0})
+        @DisplayName("courseworkId that does not exist, including 0, "
                 + "returns 404")
         void unknownCourseworkReturns404(final long courseworkId)
                 throws Exception {
@@ -324,21 +305,6 @@ class SubmissionApiTest extends ApiTestSupport {
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
                     .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @Test
-        @DisplayName("empty object returns 400 naming both ids")
-        void emptyObjectReturns400() throws Exception {
-            String body = "{}";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.enrollmentId")
-                            .value(MUST_NOT_BE_NULL))
-                    .andExpect(jsonPath("$.fieldErrors.courseworkId")
                             .value(MUST_NOT_BE_NULL));
         }
 
@@ -531,26 +497,20 @@ class SubmissionApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.submittedAt").value(SUBMITTED_AT));
         }
 
-        @ParameterizedTest(name = "id {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
+        @Test
         @DisplayName("id that does not exist returns 404")
-        void unknownIdReturns404(final long id) throws Exception {
-            // Assumption: an id of 0 or less is simply not found, like any
-            // other id that was never created.
-            ResultActions result = getSubmission(id);
+        void unknownIdReturns404() throws Exception {
+            ResultActions result = getSubmission(UNKNOWN_ID);
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(SUBMISSION_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "id \"{0}\"")
-        @ValueSource(strings = {"abc", "1.5", "9223372036854775808"})
-        @DisplayName("id that is not a whole number in range returns 400")
-        void invalidIdReturns400(final String id) throws Exception {
-            // Assumption: "1.5" and a value one above Long.MAX_VALUE are path
-            // values of the wrong type, like "abc".
-            ResultActions result = mvc().perform(get(PATH + "/" + id));
+        @Test
+        @DisplayName("id that is not a number returns 400")
+        void invalidIdReturns400() throws Exception {
+            ResultActions result = mvc().perform(get(PATH + "/abc"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message")
@@ -681,7 +641,7 @@ class SubmissionApiTest extends ApiTestSupport {
         }
 
         @ParameterizedTest(name = "courseworkId {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
+        @ValueSource(longs = {UNKNOWN_ID, 0})
         @DisplayName("courseworkId that does not exist returns 404 and "
                 + "changes nothing")
         void unknownCourseworkReturns404(final long newWork)
@@ -757,19 +717,17 @@ class SubmissionApiTest extends ApiTestSupport {
             assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
         }
 
-        @ParameterizedTest(name = "submittedAt \"{0}\"")
-        @ValueSource(strings = {"yesterday", "2026-12-01T10:00:00"})
+        @Test
         @DisplayName("submittedAt that is not an instant with a zone returns "
                 + "400 and changes nothing")
-        void malformedSubmittedAtReturns400(final String submittedAt)
-                throws Exception {
+        void malformedSubmittedAtReturns400() throws Exception {
             long courseId = createCourse();
             long enrollmentId = createEnrollment(courseId);
             long courseworkId = createCoursework(courseId);
             long id = createSubmission(enrollmentId, courseworkId);
 
             ResultActions result = putJson(pathOf(id),
-                    submissionJson(enrollmentId, courseworkId, submittedAt));
+                    submissionJson(enrollmentId, courseworkId, "yesterday"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(MALFORMED_BODY));

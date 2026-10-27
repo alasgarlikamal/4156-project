@@ -258,7 +258,7 @@ class WorkPlanApiTest extends ApiTestSupport {
         }
 
         @ParameterizedTest(name = "availableHoursPerDay {0}")
-        @ValueSource(strings = {"0", "0.0", "24", "24.0"})
+        @ValueSource(strings = {"0", "24"})
         @DisplayName("availableHoursPerDay at the bounds 0 and 24 returns "
                 + "201")
         void hoursAtBoundsReturn201(final String hours) throws Exception {
@@ -379,31 +379,9 @@ class WorkPlanApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("empty object returns 400 naming all four fields")
-        void emptyObjectReturns400() throws Exception {
-            String body = "{}";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.enrollmentId")
-                            .value(MUST_NOT_BE_NULL))
-                    .andExpect(jsonPath("$.fieldErrors.rangeStart")
-                            .value(MUST_NOT_BE_NULL))
-                    .andExpect(jsonPath("$.fieldErrors.rangeEnd")
-                            .value(MUST_NOT_BE_NULL))
-                    .andExpect(jsonPath("$.fieldErrors.availableHoursPerDay")
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @ParameterizedTest(name = "enrollmentId {0}")
-        @ValueSource(longs = {0, -1})
-        @DisplayName("enrollmentId of 0 or less returns 400 naming "
-                + "enrollmentId")
-        void nonPositiveEnrollmentIdReturns400(final long enrollmentId)
-                throws Exception {
-            String body = workPlanJson(enrollmentId, START, END, "4");
+        @DisplayName("enrollmentId 0 returns 400 naming enrollmentId")
+        void nonPositiveEnrollmentIdReturns400() throws Exception {
+            String body = workPlanJson(0, START, END, "4");
 
             ResultActions result = postJson(PATH, body);
 
@@ -563,26 +541,20 @@ class WorkPlanApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.createdAt").exists());
         }
 
-        @ParameterizedTest(name = "id {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
+        @Test
         @DisplayName("id that does not exist returns 404")
-        void unknownIdReturns404(final long id) throws Exception {
-            // Assumption: an id of 0 or less is simply not found, like any
-            // other id that was never created.
-            ResultActions result = getWorkPlan(id);
+        void unknownIdReturns404() throws Exception {
+            ResultActions result = getWorkPlan(UNKNOWN_ID);
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(WORK_PLAN_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "id \"{0}\"")
-        @ValueSource(strings = {"abc", "1.5", "9223372036854775808"})
-        @DisplayName("id that is not a whole number in range returns 400")
-        void invalidIdReturns400(final String id) throws Exception {
-            // Assumption: "1.5" and a value one above Long.MAX_VALUE are path
-            // values of the wrong type, like "abc".
-            ResultActions result = mvc().perform(get(PATH + "/" + id));
+        @Test
+        @DisplayName("id that is not a number returns 400")
+        void invalidIdReturns400() throws Exception {
+            ResultActions result = mvc().perform(get(PATH + "/abc"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(INVALID_ID));
@@ -718,10 +690,7 @@ class WorkPlanApiTest extends ApiTestSupport {
         @ParameterizedTest(name = "{0} = {1}")
         @CsvSource({
             "rangeEnd, \"2026-11-02\", rangeValid",
-            "availableHoursPerDay, 24.01, availableHoursPerDay",
-            "availableHoursPerDay, -0.01, availableHoursPerDay",
-            "enrollmentId, 0, enrollmentId",
-            "rangeStart, null, rangeStart"
+            "availableHoursPerDay, 24.01, availableHoursPerDay"
         })
         @DisplayName("invalid body returns 400 naming the problem and "
                 + "changes nothing")

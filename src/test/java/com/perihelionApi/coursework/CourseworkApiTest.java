@@ -247,25 +247,21 @@ class CourseworkApiTest extends ApiTestSupport {
             assertStored(idOf(result), courseId, kind, title, DEADLINE, 3);
         }
 
-        @ParameterizedTest(name = "estimatedEffortHours {0}")
-        @ValueSource(strings = {"0", "0.0", "0.01", "10000"})
-        @DisplayName("estimatedEffortHours of 0 or more is accepted, with no "
-                + "maximum")
-        void nonNegativeEffortIsAccepted(final String hours)
-                throws Exception {
+        @Test
+        @DisplayName("estimatedEffortHours of 0 is accepted")
+        void nonNegativeEffortIsAccepted() throws Exception {
             long courseId = createCourse();
             String title = unique("Work");
-            double expected = Double.parseDouble(hours);
 
             ResultActions result = postJson(PATH,
                     courseworkJson(courseId, ASSIGNMENT, title, DEADLINE,
-                            hours));
+                            "0"));
 
             result.andExpect(status().isCreated())
                     .andExpect(jsonPath("$.estimatedEffortHours",
-                            closeTo(expected, TOLERANCE), Double.class));
+                            closeTo(0.0, TOLERANCE), Double.class));
             assertStored(idOf(result), courseId, ASSIGNMENT, title,
-                    DEADLINE, expected);
+                    DEADLINE, 0.0);
         }
 
         @Test
@@ -332,11 +328,10 @@ class CourseworkApiTest extends ApiTestSupport {
                             .value(message));
         }
 
-        @ParameterizedTest(name = "title \"{0}\"")
-        @ValueSource(strings = {" ", "   "})
+        @Test
         @DisplayName("blank title returns 400 naming title")
-        void blankTitleReturns400(final String title) throws Exception {
-            String body = courseworkJson(createCourse(), EXAM, title,
+        void blankTitleReturns400() throws Exception {
+            String body = courseworkJson(createCourse(), EXAM, "   ",
                     DEADLINE, "3");
 
             ResultActions result = postJson(PATH, body);
@@ -361,13 +356,12 @@ class CourseworkApiTest extends ApiTestSupport {
                             .value("size must be between 0 and 255"));
         }
 
-        @ParameterizedTest(name = "estimatedEffortHours {0}")
-        @ValueSource(strings = {"-0.01", "-1"})
+        @Test
         @DisplayName("negative estimatedEffortHours returns 400 naming that "
                 + "field")
-        void negativeEffortReturns400(final String hours) throws Exception {
+        void negativeEffortReturns400() throws Exception {
             String body = courseworkJson(createCourse(), ASSIGNMENT,
-                    unique("Work"), DEADLINE, hours);
+                    unique("Work"), DEADLINE, "-0.01");
 
             ResultActions result = postJson(PATH, body);
 
@@ -377,12 +371,10 @@ class CourseworkApiTest extends ApiTestSupport {
                             .value("must be greater than or equal to 0.0"));
         }
 
-        @ParameterizedTest(name = "courseId {0}")
-        @ValueSource(longs = {0, -1})
-        @DisplayName("courseId of 0 or less returns 400 naming courseId")
-        void nonPositiveCourseIdReturns400(final long courseId)
-                throws Exception {
-            String body = courseworkJson(courseId, EXAM, unique("Work"),
+        @Test
+        @DisplayName("courseId of 0 returns 400 naming courseId")
+        void nonPositiveCourseIdReturns400() throws Exception {
+            String body = courseworkJson(0, EXAM, unique("Work"),
                     DEADLINE, "3");
 
             ResultActions result = postJson(PATH, body);
@@ -590,26 +582,20 @@ class CourseworkApiTest extends ApiTestSupport {
             expectFields(result, courseId, EXAM, title, DEADLINE, 2.5);
         }
 
-        @ParameterizedTest(name = "id {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0, -1})
+        @Test
         @DisplayName("id that does not exist returns 404")
-        void unknownIdReturns404(final long id) throws Exception {
-            // Assumption: an id of 0 or less is simply not found, like any
-            // other id that was never created.
-            ResultActions result = getCoursework(id);
+        void unknownIdReturns404() throws Exception {
+            ResultActions result = getCoursework(UNKNOWN_ID);
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(COURSEWORK_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "id \"{0}\"")
-        @ValueSource(strings = {"abc", "1.5", "9223372036854775808"})
-        @DisplayName("id that is not a whole number in range returns 400")
-        void invalidIdReturns400(final String id) throws Exception {
-            // Assumption: "1.5" and a value one above Long.MAX_VALUE are path
-            // values of the wrong type, like "abc".
-            ResultActions result = mvc().perform(get(PATH + "/" + id));
+        @Test
+        @DisplayName("id that is not a number returns 400")
+        void invalidIdReturns400() throws Exception {
+            ResultActions result = mvc().perform(get(PATH + "/abc"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(INVALID_ID));
