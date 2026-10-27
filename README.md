@@ -1,9 +1,10 @@
 # Perihelion: Academic Planning and Assessment Service
 
 A Java/Spring Boot REST service backed by SQLite. The current MVP supports CRUD
-for courses, enrollments, assignments, tasks, and submissions (25 operations).
-Workload analysis, work-plan generation, grading, progress analysis, and Google
-Calendar integration are planned features. No authentication is configured.
+for courses, enrollments, coursework, submissions, work plans, and tasks
+(30 operations). Workload analysis, automatic work-plan generation, grading,
+progress analysis, and Google Calendar integration are planned features. No
+authentication is configured.
 
 ## Team
 
@@ -38,33 +39,29 @@ Database and connection settings are in
 
 ## API documentation
 
-See the **[API reference and usage examples](docs/api.md)** for all endpoints,
-request/response fields, validation, side effects, status codes, call order,
-and valid/invalid usage scenarios.
+See the **[API reference and usage examples](docs/api.md)** for endpoint
+fields, validation, status codes, call order, and valid/invalid usage scenarios.
 
 | Resource | Base path | List filters |
 | --- | --- | --- |
 | Courses | `/api/courses` | `title`, `code` |
 | Enrollments | `/api/enrollments` | `courseId`, `learnerRef` |
-| Assignments | `/api/assignments` | `courseId` |
-| Tasks | `/api/tasks` | `enrollmentId`, `workplanId`, `courseworkId` |
+| Coursework | `/api/coursework` | `courseId`, `kind` (`EXAM` or `ASSIGNMENT`) |
 | Submissions | `/api/submissions` | `enrollmentId`, `courseworkId` |
+| Work plans | `/api/workplans` | `enrollmentId` |
+| Tasks | `/api/tasks` | `enrollmentId`, `workPlanId`, `courseworkId` |
 
 Each resource supports POST and GET on its base path, and GET, PUT, and DELETE
-on `/{id}`. Create courses before enrollments/assignments and enrollments before
-submissions. Delete dependent records first; there are no cascading deletes.
-
-Current limitations: assignments do not create coursework records; submissions
-do not validate coursework existence; tasks do not validate linked IDs or effort.
-Task filters use precedence rather than combining all supplied filters. Details
-are in the API reference.
+on `/{id}`. Create a course before its coursework and enrollments, then a work
+plan before its tasks. Delete dependent records first; there are no cascading
+deletes. Field rules, ordering, and 409 cases are in the API reference.
 
 ## Tests and code quality
 
 Build dependencies and plugins are configured in [pom.xml](pom.xml).
 Tests are grouped by resource and layer in [src/test/java](src/test/java), using
 JUnit 5 and Mockito. MockMvc controller tests mock services; service tests mock
-repositories. The assignment integration test uses SQLite with the
+repositories. Integration tests use SQLite with the
 [test profile](src/test/resources/application-test.properties), which selects an
 in-memory database instead of the development database.
 
