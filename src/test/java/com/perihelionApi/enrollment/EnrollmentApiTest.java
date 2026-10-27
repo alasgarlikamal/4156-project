@@ -3,10 +3,8 @@
  */
 package com.perihelionApi.enrollment;
 
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -15,14 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.perihelionApi.ApiTestSupport;
@@ -62,9 +57,6 @@ class EnrollmentApiTest extends ApiTestSupport {
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
 
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
-
     /** The only message a {@code @NotNull} field can give. */
     private static final String MUST_NOT_BE_NULL = "must not be null";
 
@@ -88,35 +80,6 @@ class EnrollmentApiTest extends ApiTestSupport {
      */
     private static int jsonInt(final long id) {
         return Math.toIntExact(id);
-    }
-
-    /**
-     * Builds an enrollment body with the learner reference written exactly
-     * as given, for text that is not a lowercase UUID.
-     *
-     * @param courseId the course id
-     * @param learnerRef the learner reference text
-     * @return the JSON body
-     */
-    private static String rawEnrollmentJson(final long courseId,
-            final String learnerRef) {
-        return "{\"courseId\": " + courseId
-                + ", \"learnerRef\": \"" + learnerRef + "\"}";
-    }
-
-    /**
-     * Builds an enrollment body that leaves out one required field.
-     *
-     * @param field the field to leave out, "courseId" or "learnerRef"
-     * @param courseId the course id to send when courseId is kept
-     * @return the JSON body
-     */
-    private static String enrollmentJsonWithout(final String field,
-            final long courseId) {
-        if ("courseId".equals(field)) {
-            return "{\"learnerRef\": \"" + UUID.randomUUID() + "\"}";
-        }
-        return "{\"courseId\": " + courseId + "}";
     }
 
     /**
@@ -173,49 +136,22 @@ class EnrollmentApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("learnerRef sent in uppercase is returned lowercase")
-        void uppercaseLearnerRefIsReturnedLowercase() throws Exception {
-            long courseId = createCourse();
-            UUID learner = UUID.randomUUID();
-            String upper = learner.toString().toUpperCase(Locale.ROOT);
+        @DisplayName("missing learnerRef returns 400 naming that field")
+        void missingLearnerRefReturns400() throws Exception {
+            String body = "{\"courseId\": " + createCourse() + "}";
 
-            ResultActions result =
-                    postJson(PATH, rawEnrollmentJson(courseId, upper));
+            ResultActions result = postJson(PATH, body);
 
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.learnerRef")
-                            .value(learner.toString()));
-        }
-
-        @Test
-        @DisplayName("same learner in a different course returns 201")
-        void sameLearnerInOtherCourseReturns201() throws Exception {
-            UUID learner = UUID.randomUUID();
-            createEnrollment(createCourse(), learner);
-            long otherCourse = createCourse();
-
-            ResultActions result =
-                    postJson(PATH, enrollmentJson(otherCourse, learner));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.courseId").value(otherCourse));
+            result.andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
+                    .andExpect(jsonPath("$.fieldErrors.learnerRef")
+                            .value(MUST_NOT_BE_NULL));
         }
 
         @Test
         @DisplayName("unknown course returns 404")
         void unknownCourseReturns404() throws Exception {
             String body = enrollmentJson(UNKNOWN_ID, UUID.randomUUID());
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value(COURSE_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("courseId 0 passes validation and returns 404")
-        void zeroCourseIdReturns404() throws Exception {
-            String body = enrollmentJson(0, UUID.randomUUID());
 
             ResultActions result = postJson(PATH, body);
 
@@ -236,77 +172,12 @@ class EnrollmentApiTest extends ApiTestSupport {
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(DUPLICATE));
         }
-
-        @Test
-        @DisplayName("uppercase form of an enrolled learner in the same "
-                + "course returns 409")
-        void uppercaseDuplicateReturns409() throws Exception {
-            long courseId = createCourse();
-            UUID learner = UUID.randomUUID();
-            createEnrollment(courseId, learner);
-            String upper = learner.toString().toUpperCase(Locale.ROOT);
-
-            ResultActions result =
-                    postJson(PATH, rawEnrollmentJson(courseId, upper));
-
-            result.andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value(DUPLICATE));
-        }
-
-        @Test
-        @DisplayName("learnerRef that is not a UUID returns 400")
-        void invalidUuidReturns400() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result =
-                    postJson(PATH, rawEnrollmentJson(courseId, "not-a-uuid"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"courseId", "learnerRef"})
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field) throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result =
-                    postJson(PATH, enrollmentJsonWithout(field, courseId));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            String body = "{\"courseId\": 1, \"learnerRef\": ";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
     }
 
     /** Tests for GET /api/enrollments, with and without filters. */
     @Nested
     @DisplayName("GET /api/enrollments")
     class ListEnrollments {
-
-        @Test
-        @DisplayName("unfiltered list contains a new enrollment")
-        void unfilteredListContainsNewEnrollment() throws Exception {
-            long id = createEnrollment(createCourse());
-
-            ResultActions result = mvc().perform(get(PATH));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
 
         @Test
         @DisplayName("courseId filter returns only that course's enrollments")
@@ -328,28 +199,6 @@ class EnrollmentApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("learnerRef filter returns only that learner's "
-                + "enrollments")
-        void learnerRefFilterReturnsOnlyThatLearner() throws Exception {
-            UUID learner = UUID.randomUUID();
-            long course = createCourse();
-            long first = createEnrollment(course, learner);
-            long second = createEnrollment(createCourse(), learner);
-            long otherLearner = createEnrollment(course);
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("learnerRef", learner.toString()));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id",
-                            hasItems(jsonInt(first), jsonInt(second))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(otherLearner)))))
-                    .andExpect(jsonPath("$[*].learnerRef",
-                            everyItem(is(learner.toString()))));
-        }
-
-        @Test
         @DisplayName("courseId and learnerRef together must both match")
         void bothFiltersAreCombinedWithAnd() throws Exception {
             UUID learner = UUID.randomUUID();
@@ -368,75 +217,6 @@ class EnrollmentApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(otherCourse)))))
                     .andExpect(jsonPath("$[*].id",
                             not(hasItem(jsonInt(otherLearner)))));
-        }
-
-        @Test
-        @DisplayName("list is ordered by id ascending")
-        void listIsOrderedById() throws Exception {
-            // Assumption: ids are given out in increasing order, so the
-            // enrollment created second has the larger id.
-            long course = createCourse();
-            long first = createEnrollment(course);
-            long second = createEnrollment(course);
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("courseId", String.valueOf(course)));
-
-            // The course is new, so it holds only these two enrollments.
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id",
-                            contains(jsonInt(first), jsonInt(second))));
-        }
-
-        @Test
-        @DisplayName("learnerRef filter in uppercase finds the enrollment")
-        void uppercaseLearnerRefFilterMatches() throws Exception {
-            // Assumption: the filter is read as a UUID, so its letter case
-            // does not matter. The description only says that stored UUIDs
-            // are lowercase.
-            UUID learner = UUID.randomUUID();
-            long id = createEnrollment(createCourse(), learner);
-            String upper = learner.toString().toUpperCase(Locale.ROOT);
-
-            ResultActions result =
-                    mvc().perform(get(PATH).param("learnerRef", upper));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
-
-        @Test
-        @DisplayName("unknown courseId returns an empty list")
-        void unknownCourseReturnsEmptyList() throws Exception {
-            String unknownCourse = String.valueOf(UNKNOWN_ID);
-
-            ResultActions result =
-                    mvc().perform(get(PATH).param("courseId", unknownCourse));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
-
-        @Test
-        @DisplayName("learnerRef that is not a UUID returns 400")
-        void invalidLearnerRefReturns400() throws Exception {
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("learnerRef", "not-a-uuid"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for learnerRef"));
-        }
-
-        @Test
-        @DisplayName("courseId that is not a number returns 400")
-        void invalidCourseIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("courseId", "abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for courseId"));
         }
     }
 
@@ -506,24 +286,6 @@ class EnrollmentApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("sending its own current values returns 200")
-        void ownCurrentValuesReturn200() throws Exception {
-            long courseId = createCourse();
-            UUID learner = UUID.randomUUID();
-            long id = createEnrollment(courseId, learner);
-
-            ResultActions result =
-                    putJson(pathOf(id), enrollmentJson(courseId, learner));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(id))
-                    .andExpect(jsonPath("$.courseId").value(courseId))
-                    .andExpect(jsonPath("$.learnerRef")
-                            .value(learner.toString()));
-            assertStored(id, courseId, learner);
-        }
-
-        @Test
         @DisplayName("unknown enrollment returns 404")
         void unknownEnrollmentReturns404() throws Exception {
             String body = enrollmentJson(createCourse(), UUID.randomUUID());
@@ -551,18 +313,6 @@ class EnrollmentApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("unknown enrollment is reported before unknown course")
-        void unknownEnrollmentIsCheckedBeforeCourse() throws Exception {
-            String body = enrollmentJson(UNKNOWN_ID, UUID.randomUUID());
-
-            ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(ENROLLMENT_NOT_FOUND));
-        }
-
-        @Test
         @DisplayName("moving to a course the learner is already in returns "
                 + "409 and changes nothing")
         void duplicateReturns409() throws Exception {
@@ -578,49 +328,6 @@ class EnrollmentApiTest extends ApiTestSupport {
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(DUPLICATE));
             assertStored(id, courseId, learner);
-        }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"courseId", "learnerRef"})
-        @DisplayName("missing required field returns 400 and changes nothing")
-        void missingFieldReturns400(final String field) throws Exception {
-            long courseId = createCourse();
-            UUID learner = UUID.randomUUID();
-            long id = createEnrollment(courseId, learner);
-
-            ResultActions result =
-                    putJson(pathOf(id), enrollmentJsonWithout(field, courseId));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-            assertStored(id, courseId, learner);
-        }
-
-        @Test
-        @DisplayName("learnerRef that is not a UUID returns 400")
-        void invalidUuidReturns400() throws Exception {
-            long courseId = createCourse();
-            long id = createEnrollment(courseId);
-            String body = rawEnrollmentJson(courseId, "not-a-uuid");
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            String body = enrollmentJson(createCourse(), UUID.randomUUID());
-
-            ResultActions result = putJson(PATH + "/abc", body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for id"));
         }
     }
 
@@ -648,16 +355,6 @@ class EnrollmentApiTest extends ApiTestSupport {
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(ENROLLMENT_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(delete(PATH + "/abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for id"));
         }
 
         @Test

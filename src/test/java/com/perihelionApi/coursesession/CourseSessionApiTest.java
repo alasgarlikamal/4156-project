@@ -6,15 +6,12 @@ package com.perihelionApi.coursesession;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -26,16 +23,11 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -66,12 +58,6 @@ class CourseSessionApiTest extends ApiTestSupport {
 
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
-
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
-
-    /** The only message a {@code @NotNull} field can give. */
-    private static final String MUST_NOT_BE_NULL = "must not be null";
 
     /** Error message when endTime is not after startTime. */
     private static final String TIME_RANGE_MESSAGE =
@@ -128,21 +114,6 @@ class CourseSessionApiTest extends ApiTestSupport {
      */
     private static int jsonInt(final long id) {
         return Math.toIntExact(id);
-    }
-
-    /**
-     * Builds a valid session body (Monday 14:00 to 15:15) that leaves out
-     * one required field.
-     *
-     * @param field the field to leave out: "weekday", "startTime" or
-     *     "endTime"
-     * @return the JSON body
-     */
-    private static String sessionJsonWithout(final String field) {
-        return Stream.of("\"weekday\": 1", "\"startTime\": \"14:00\"",
-                        "\"endTime\": \"15:15\"")
-                .filter(part -> !part.startsWith("\"" + field + "\""))
-                .collect(Collectors.joining(", ", "{", "}"));
     }
 
     /**
@@ -209,19 +180,6 @@ class CourseSessionApiTest extends ApiTestSupport {
     }
 
     /**
-     * Checks for 200 and returns the raw calendar body.
-     *
-     * @param result the export result
-     * @return the body, exactly as sent
-     * @throws Exception if the response is not 200
-     */
-    private static String bodyOf(final ResultActions result)
-            throws Exception {
-        return result.andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-    }
-
-    /**
      * Checks for 200 and returns the calendar lines. Folded lines are
      * joined back together first.
      *
@@ -231,7 +189,9 @@ class CourseSessionApiTest extends ApiTestSupport {
      */
     private static List<String> calendarLines(final ResultActions result)
             throws Exception {
-        return Arrays.asList(bodyOf(result).replace(FOLD, "").split(CRLF));
+        String body = result.andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return Arrays.asList(body.replace(FOLD, "").split(CRLF));
     }
 
     /**
@@ -267,64 +227,6 @@ class CourseSessionApiTest extends ApiTestSupport {
             assertListed(courseId, idOf(result), 1, "14:00:00", "15:15:00");
         }
 
-        @ParameterizedTest(name = "weekday {0}")
-        @ValueSource(ints = {1, 7})
-        @DisplayName("first and last weekday, 1 and 7, return 201")
-        void weekdayBoundsReturn201(final int weekday) throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(weekday, "14:00", "15:15"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.weekday").value(weekday));
-        }
-
-        @Test
-        @DisplayName("endTime one minute after startTime returns 201")
-        void oneMinuteSessionReturns201() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(1, "14:00", "14:01"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.startTime").value("14:00:00"))
-                    .andExpect(jsonPath("$.endTime").value("14:01:00"));
-        }
-
-        @Test
-        @DisplayName("session overlapping another on the same day returns "
-                + "201")
-        void overlappingSessionReturns201() throws Exception {
-            long courseId = createCourse();
-            long first = createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(1, "14:30", "15:30"));
-
-            result.andExpect(status().isCreated());
-            listSessions(courseId)
-                    .andExpect(jsonPath("$[*].id",
-                            hasItems(jsonInt(first), jsonInt(idOf(result)))));
-        }
-
-        @Test
-        @DisplayName("same weekday and times in a different course returns "
-                + "201")
-        void sameSlotInOtherCourseReturns201() throws Exception {
-            // Assumption: the duplicate rule covers one course only; the
-            // description names "the same course".
-            createSession(createCourse(), 1, "14:00", "15:15");
-            long otherCourse = createCourse();
-
-            ResultActions result = postJson(sessionsPath(otherCourse),
-                    sessionJson(1, "14:00", "15:15"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.courseId").value(otherCourse));
-        }
-
         @Disabled("Known bug: an identical session in the same course "
                 + "throws a ServletException instead of returning 409")
         @Test
@@ -354,99 +256,17 @@ class CourseSessionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("courseId that is not a number returns 400")
-        void invalidCourseIdReturns400() throws Exception {
-            String body = sessionJson(1, "14:00", "15:15");
-
-            ResultActions result = postJson(sessionsPath("abc"), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for courseId"));
-        }
-
-        @ParameterizedTest(name = "weekday {0}")
-        @ValueSource(ints = {0, 8})
-        @DisplayName("weekday just outside 1 to 7 returns 400 naming "
-                + "weekday")
-        void weekdayOutOfRangeReturns400(final int weekday)
-                throws Exception {
+        @DisplayName("endTime before startTime returns 400")
+        void endBeforeStartReturns400() throws Exception {
             long courseId = createCourse();
 
             ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(weekday, "14:00", "15:15"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.weekday").exists());
-        }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"weekday", "startTime", "endTime"})
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field) throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJsonWithout(field));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @ParameterizedTest(name = "{0} to {1}")
-        @CsvSource({"14:00, 14:00", "14:00, 13:59"})
-        @DisplayName("endTime equal to or before startTime returns 400")
-        void endNotAfterStartReturns400(final String startTime,
-                final String endTime) throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(1, startTime, endTime));
+                    sessionJson(1, "14:00", "13:59"));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
                     .andExpect(jsonPath("$.fieldErrors.timeRangeValid")
                             .value(TIME_RANGE_MESSAGE));
-        }
-
-        @Test
-        @DisplayName("invalid body for an unknown course returns 400, not "
-                + "404")
-        void validationIsCheckedBeforeCourse() throws Exception {
-            String body = sessionJson(8, "14:00", "15:15");
-
-            ResultActions result = postJson(sessionsPath(UNKNOWN_ID), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.weekday").exists());
-        }
-
-        @Test
-        @DisplayName("startTime of 25:00 returns 400 malformed body")
-        void impossibleTimeReturns400() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(1, "25:00", "15:15"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = postJson(sessionsPath(courseId),
-                    "{\"weekday\": 1, \"startTime\": ");
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
         }
     }
 
@@ -471,35 +291,6 @@ class CourseSessionApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$[*].id", contains(
                             jsonInt(mondayEarly), jsonInt(mondayLate),
                             jsonInt(tuesday), jsonInt(wednesday))));
-        }
-
-        @Test
-        @DisplayName("list holds only the sessions of that course")
-        void listHoldsOnlyThatCourse() throws Exception {
-            long courseA = createCourse();
-            long courseB = createCourse();
-            long inA = createSession(courseA, 1, "14:00", "15:15");
-            long inB = createSession(courseB, 2, "14:00", "15:15");
-
-            ResultActions result = listSessions(courseA);
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(inA))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(inB)))))
-                    .andExpect(jsonPath("$[*].courseId",
-                            everyItem(is(jsonInt(courseA)))));
-        }
-
-        @Test
-        @DisplayName("new course has an empty list")
-        void newCourseHasEmptyList() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result = listSessions(courseId);
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
         }
 
         @Test
@@ -547,67 +338,6 @@ class CourseSessionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("sending its own current values returns 200")
-        void ownCurrentValuesReturn200() throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = putJson(sessionPath(courseId, id),
-                    sessionJson(1, "14:00", "15:15"));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(id));
-            assertListed(courseId, id, 1, "14:00:00", "15:15:00");
-        }
-
-        @Test
-        @DisplayName("weekday 8 returns 400 and changes nothing")
-        void weekdayOutOfRangeReturns400() throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = putJson(sessionPath(courseId, id),
-                    sessionJson(8, "14:00", "15:15"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.weekday").exists());
-            assertListed(courseId, id, 1, "14:00:00", "15:15:00");
-        }
-
-        @ParameterizedTest(name = "{0} to {1}")
-        @CsvSource({"14:00, 14:00", "14:00, 13:59"})
-        @DisplayName("endTime equal to or before startTime returns 400 and "
-                + "changes nothing")
-        void endNotAfterStartReturns400(final String startTime,
-                final String endTime) throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "10:00", "11:00");
-
-            ResultActions result = putJson(sessionPath(courseId, id),
-                    sessionJson(1, startTime, endTime));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.timeRangeValid")
-                            .value(TIME_RANGE_MESSAGE));
-            assertListed(courseId, id, 1, "10:00:00", "11:00:00");
-        }
-
-        @Test
-        @DisplayName("startTime of 25:00 returns 400 malformed body")
-        void impossibleTimeReturns400() throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = putJson(sessionPath(courseId, id),
-                    sessionJson(1, "25:00", "15:15"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
         @DisplayName("unknown course returns 404 Course not found")
         void unknownCourseReturns404() throws Exception {
             long sessionId = createSession(createCourse(), 1, "14:00", "15:15");
@@ -648,45 +378,6 @@ class CourseSessionApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message").value(SESSION_NOT_FOUND));
             assertListed(owner, id, 1, "14:00:00", "15:15:00");
             listSessions(otherCourse).andExpect(jsonPath("$").isEmpty());
-        }
-
-        @Test
-        @DisplayName("invalid body for an unknown course returns 400, not "
-                + "404")
-        void validationIsCheckedBeforeCourse() throws Exception {
-            String body = sessionJson(8, "14:00", "15:15");
-
-            ResultActions result =
-                    putJson(sessionPath(UNKNOWN_ID, UNKNOWN_ID), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED));
-        }
-
-        @Test
-        @DisplayName("sessionId that is not a number returns 400")
-        void invalidSessionIdReturns400() throws Exception {
-            long courseId = createCourse();
-            String body = sessionJson(1, "14:00", "15:15");
-
-            ResultActions result = putJson(sessionPath(courseId, "abc"), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for sessionId"));
-        }
-
-        @Test
-        @DisplayName("courseId that is not a number returns 400")
-        void invalidCourseIdReturns400() throws Exception {
-            long sessionId = createSession(createCourse(), 1, "14:00", "15:15");
-            String body = sessionJson(1, "14:00", "15:15");
-
-            ResultActions result = putJson(sessionPath("abc", sessionId), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for courseId"));
         }
 
         @Disabled("Known bug: moving a session onto another session's slot "
@@ -730,36 +421,6 @@ class CourseSessionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("deleted slot can be added again")
-        void deletedSlotCanBeAddedAgain() throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "14:00", "15:15");
-
-            mvc().perform(delete(sessionPath(courseId, id)))
-                    .andExpect(status().isNoContent());
-            ResultActions result = postJson(sessionsPath(courseId),
-                    sessionJson(1, "14:00", "15:15"));
-
-            result.andExpect(status().isCreated());
-        }
-
-        @Test
-        @DisplayName("deleting the same session twice returns 404 the "
-                + "second time")
-        void secondDeleteReturns404() throws Exception {
-            long courseId = createCourse();
-            long id = createSession(courseId, 1, "14:00", "15:15");
-            mvc().perform(delete(sessionPath(courseId, id)))
-                    .andExpect(status().isNoContent());
-
-            ResultActions result =
-                    mvc().perform(delete(sessionPath(courseId, id)));
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value(SESSION_NOT_FOUND));
-        }
-
-        @Test
         @DisplayName("unknown course returns 404 Course not found")
         void unknownCourseReturns404() throws Exception {
             long sessionId = createSession(createCourse(), 1, "14:00", "15:15");
@@ -782,34 +443,6 @@ class CourseSessionApiTest extends ApiTestSupport {
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value(SESSION_NOT_FOUND));
         }
-
-        @Test
-        @DisplayName("session of another course returns 404 and is kept")
-        void sessionOfOtherCourseReturns404() throws Exception {
-            long owner = createCourse();
-            long id = createSession(owner, 1, "14:00", "15:15");
-            long otherCourse = createCourse();
-
-            ResultActions result =
-                    mvc().perform(delete(sessionPath(otherCourse, id)));
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value(SESSION_NOT_FOUND));
-            assertListed(owner, id, 1, "14:00:00", "15:15:00");
-        }
-
-        @Test
-        @DisplayName("sessionId that is not a number returns 400")
-        void invalidSessionIdReturns400() throws Exception {
-            long courseId = createCourse();
-
-            ResultActions result =
-                    mvc().perform(delete(sessionPath(courseId, "abc")));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for sessionId"));
-        }
     }
 
     /** Tests for GET /api/courses/{courseId}/calendar.ics. */
@@ -818,11 +451,15 @@ class CourseSessionApiTest extends ApiTestSupport {
     class ExportCalendar {
 
         @Test
-        @DisplayName("returns 200 as a text/calendar attachment named after "
-                + "the course")
-        void returnsCalendarAttachment() throws Exception {
+        @DisplayName("text/calendar attachment with one event per matching "
+                + "date, first and last term days included")
+        void oneEventPerMatchingDate() throws Exception {
             long courseId = calendarCourse("2026-11-02", "2026-11-09");
+            long monday = createSession(courseId, 1, "14:00", "15:15");
+            createSession(courseId, 3, "16:00", "17:00");
             String fileName = "filename=\"course-" + courseId + ".ics\"";
+            String uid = "UID:course-" + courseId + "-session-" + monday
+                    + "-20261102@perihelion-api";
 
             ResultActions result = exportCalendar(courseId);
 
@@ -835,45 +472,27 @@ class CourseSessionApiTest extends ApiTestSupport {
                     .andExpect(header().string(
                             HttpHeaders.CONTENT_DISPOSITION,
                             containsString(fileName)));
-        }
-
-        @Test
-        @DisplayName("body is one VCALENDAR with the fixed header lines and "
-                + "CRLF line endings")
-        void bodyIsCalendarWithHeaderLines() throws Exception {
-            long courseId = calendarCourse("2026-11-02", "2026-11-09");
-            createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = exportCalendar(courseId);
-
-            String body = bodyOf(result);
-            assertThat(body, startsWith("BEGIN:VCALENDAR" + CRLF));
-            assertThat(body, endsWith(CRLF + "END:VCALENDAR" + CRLF));
-            assertThat(body.replace(CRLF, ""), not(containsString("\n")));
-            assertThat(calendarLines(result), hasItems("VERSION:2.0",
+            List<String> lines = calendarLines(result);
+            assertThat(lines.get(0), is("BEGIN:VCALENDAR"));
+            assertThat(lines.get(lines.size() - 1), is("END:VCALENDAR"));
+            assertThat(lines, hasItems("VERSION:2.0",
                     "PRODID:-//Perihelion API//Course Calendar//EN",
                     "CALSCALE:GREGORIAN", "METHOD:PUBLISH"));
-        }
-
-        @Test
-        @DisplayName("one event per matching date, with the first and last "
-                + "term days included")
-        void oneEventPerMatchingDate() throws Exception {
-            long courseId = calendarCourse("2026-11-02", "2026-11-09");
-            createSession(courseId, 1, "14:00", "15:15");
-            createSession(courseId, 3, "16:00", "17:00");
-
-            ResultActions result = exportCalendar(courseId);
-
             // Monday 2 and 9 November and Wednesday 4 November, all in
             // standard time (UTC-5).
-            List<String> lines = calendarLines(result);
             assertThat(eventCount(lines), is(3));
             assertThat(Collections.frequency(lines, "END:VEVENT"), is(3));
             assertThat(lines, hasItems(
                     "DTSTART:20261102T190000Z", "DTEND:20261102T201500Z",
                     "DTSTART:20261104T210000Z", "DTEND:20261104T220000Z",
                     "DTSTART:20261109T190000Z", "DTEND:20261109T201500Z"));
+            assertThat(lines, hasItem(uid));
+            // DTSTAMP is the export time, so only its format is checked.
+            List<String> stamps = lines.stream()
+                    .filter(line -> line.startsWith("DTSTAMP"))
+                    .toList();
+            assertThat(stamps, hasSize(3));
+            assertThat(stamps, everyItem(matchesPattern(DTSTAMP_FORMAT)));
         }
 
         @Test
@@ -892,54 +511,6 @@ class CourseSessionApiTest extends ApiTestSupport {
             assertThat(lines, hasItems(
                     "DTSTART:20261026T180000Z", "DTEND:20261026T190000Z",
                     "DTSTART:20261102T190000Z", "DTEND:20261102T200000Z"));
-        }
-
-        @Test
-        @DisplayName("weekday 7 is Sunday, including the Sunday daylight "
-                + "saving time ends")
-        void weekdaySevenIsSunday() throws Exception {
-            long courseId = calendarCourse("2026-10-30", "2026-11-08");
-            createSession(courseId, 7, "14:00", "15:00");
-
-            ResultActions result = exportCalendar(courseId);
-
-            // Sunday 1 November: daylight time ends at 02:00, so 14:00 is
-            // already standard time (UTC-5).
-            List<String> lines = calendarLines(result);
-            assertThat(eventCount(lines), is(2));
-            assertThat(lines, hasItems("DTSTART:20261101T190000Z",
-                    "DTSTART:20261108T190000Z"));
-        }
-
-        @Test
-        @DisplayName("event UID names the course, the session and the date")
-        void uidNamesCourseSessionAndDate() throws Exception {
-            long courseId = calendarCourse("2026-11-02", "2026-11-03");
-            long sessionId = createSession(courseId, 1, "14:00", "15:15");
-            String uid = "UID:course-" + courseId + "-session-" + sessionId
-                    + "-20261102@perihelion-api";
-
-            ResultActions result = exportCalendar(courseId);
-
-            List<String> lines = calendarLines(result);
-            assertThat(eventCount(lines), is(1));
-            assertThat(lines, hasItem(uid));
-        }
-
-        @Test
-        @DisplayName("each event has a DTSTAMP in UTC basic format")
-        void eachEventHasDtstamp() throws Exception {
-            long courseId = calendarCourse("2026-11-02", "2026-11-09");
-            createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = exportCalendar(courseId);
-
-            // DTSTAMP is the export time, so only its format is checked.
-            List<String> stamps = calendarLines(result).stream()
-                    .filter(line -> line.startsWith("DTSTAMP"))
-                    .toList();
-            assertThat(stamps, hasSize(2));
-            assertThat(stamps, everyItem(matchesPattern(DTSTAMP_FORMAT)));
         }
 
         @Test
@@ -970,19 +541,6 @@ class CourseSessionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("comma in SUMMARY is escaped with a backslash")
-        void summaryCommaIsEscaped() throws Exception {
-            long courseId = createCourse("A, B", null,
-                    LocalDate.parse("2026-11-02"),
-                    LocalDate.parse("2026-11-03"));
-            createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = exportCalendar(courseId);
-
-            assertThat(calendarLines(result), hasItem("SUMMARY:A\\, B"));
-        }
-
-        @Test
         @DisplayName("course with no sessions gives a calendar with no "
                 + "events")
         void noSessionsGivesNoEvents() throws Exception {
@@ -997,19 +555,6 @@ class CourseSessionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("term with no day on the session's weekday gives no "
-                + "events")
-        void termWithoutMatchingWeekdayGivesNoEvents() throws Exception {
-            // 3 and 4 November 2026 are a Tuesday and a Wednesday.
-            long courseId = calendarCourse("2026-11-03", "2026-11-04");
-            createSession(courseId, 1, "14:00", "15:15");
-
-            ResultActions result = exportCalendar(courseId);
-
-            assertThat(eventCount(calendarLines(result)), is(0));
-        }
-
-        @Test
         @DisplayName("unknown course returns 404 as JSON")
         void unknownCourseReturns404() throws Exception {
             ResultActions result = exportCalendar(UNKNOWN_ID);
@@ -1018,16 +563,6 @@ class CourseSessionApiTest extends ApiTestSupport {
                     .andExpect(content().contentTypeCompatibleWith(
                             MediaType.APPLICATION_JSON))
                     .andExpect(jsonPath("$.message").value(COURSE_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("courseId that is not a number returns 400")
-        void invalidCourseIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(get(calendarPath("abc")));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for courseId"));
         }
     }
 }

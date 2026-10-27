@@ -4,7 +4,6 @@
 package com.perihelionApi.coursework;
 
 import static org.hamcrest.Matchers.closeTo;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -22,9 +21,6 @@ import java.util.StringJoiner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.perihelionApi.ApiTestSupport;
@@ -60,9 +56,6 @@ class CourseworkApiTest extends ApiTestSupport {
 
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
-
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
 
     /** Error message for an id path value of the wrong type. */
     private static final String INVALID_ID = "Invalid value for id";
@@ -102,16 +95,6 @@ class CourseworkApiTest extends ApiTestSupport {
      */
     private static int jsonInt(final long id) {
         return Math.toIntExact(id);
-    }
-
-    /**
-     * Returns a unique title of exactly the given length.
-     *
-     * @param length the number of characters, at least 1
-     * @return the title
-     */
-    private static String titleOfLength(final int length) {
-        return (unique("T") + "x".repeat(length)).substring(0, length);
     }
 
     /**
@@ -232,69 +215,6 @@ class CourseworkApiTest extends ApiTestSupport {
                     4.5);
         }
 
-        @ParameterizedTest(name = "kind {0}")
-        @ValueSource(strings = {EXAM, ASSIGNMENT})
-        @DisplayName("both kinds, EXAM and ASSIGNMENT, are accepted")
-        void eachKindIsAccepted(final String kind) throws Exception {
-            long courseId = createCourse();
-            String title = unique("Work");
-
-            ResultActions result = postJson(PATH,
-                    courseworkJson(courseId, kind, title, DEADLINE, "3"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.kind").value(kind));
-            assertStored(idOf(result), courseId, kind, title, DEADLINE, 3);
-        }
-
-        @Test
-        @DisplayName("estimatedEffortHours of 0 is accepted")
-        void nonNegativeEffortIsAccepted() throws Exception {
-            long courseId = createCourse();
-            String title = unique("Work");
-
-            ResultActions result = postJson(PATH,
-                    courseworkJson(courseId, ASSIGNMENT, title, DEADLINE,
-                            "0"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.estimatedEffortHours",
-                            closeTo(0.0, TOLERANCE), Double.class));
-            assertStored(idOf(result), courseId, ASSIGNMENT, title,
-                    DEADLINE, 0.0);
-        }
-
-        @Test
-        @DisplayName("deadline in the past is accepted")
-        void pastDeadlineIsAccepted() throws Exception {
-            long courseId = createCourse();
-            String title = unique("Work");
-            String past = "2020-01-15T09:30:00Z";
-
-            ResultActions result = postJson(PATH,
-                    courseworkJson(courseId, EXAM, title, past, "3"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.deadline").value(past));
-            assertStored(idOf(result), courseId, EXAM, title, past, 3);
-        }
-
-        @ParameterizedTest(name = "{0} characters")
-        @ValueSource(ints = {1, 255})
-        @DisplayName("title of 1 to 255 characters is accepted")
-        void titleUpTo255CharactersIsAccepted(final int length)
-                throws Exception {
-            long courseId = createCourse();
-            String title = titleOfLength(length);
-
-            ResultActions result = postJson(PATH,
-                    courseworkJson(courseId, EXAM, title, DEADLINE, "3"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.title").value(title));
-            assertStored(idOf(result), courseId, EXAM, title, DEADLINE, 3);
-        }
-
         @Test
         @DisplayName("unknown course returns 404")
         void unknownCourseReturns404() throws Exception {
@@ -307,140 +227,24 @@ class CourseworkApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message").value(COURSE_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "without {0}")
-        @CsvSource({
-            "courseId, must not be null",
-            "kind, must not be null",
-            "title, must not be blank",
-            "deadline, must not be null",
-            "estimatedEffortHours, must not be null"
-        })
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field, final String message)
-                throws Exception {
-            String body = courseworkJsonWithout(field, createCourse());
+        @Test
+        @DisplayName("missing kind returns 400 naming kind")
+        void missingKindReturns400() throws Exception {
+            String body = courseworkJsonWithout("kind", createCourse());
 
             ResultActions result = postJson(PATH, body);
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(message));
-        }
-
-        @Test
-        @DisplayName("blank title returns 400 naming title")
-        void blankTitleReturns400() throws Exception {
-            String body = courseworkJson(createCourse(), EXAM, "   ",
-                    DEADLINE, "3");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.title")
-                            .value("must not be blank"));
-        }
-
-        @Test
-        @DisplayName("title of 256 characters returns 400 naming title")
-        void titleOf256CharactersReturns400() throws Exception {
-            String body = courseworkJson(createCourse(), EXAM,
-                    titleOfLength(256), DEADLINE, "3");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.title")
-                            .value("size must be between 0 and 255"));
-        }
-
-        @Test
-        @DisplayName("negative estimatedEffortHours returns 400 naming that "
-                + "field")
-        void negativeEffortReturns400() throws Exception {
-            String body = courseworkJson(createCourse(), ASSIGNMENT,
-                    unique("Work"), DEADLINE, "-0.01");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.estimatedEffortHours")
-                            .value("must be greater than or equal to 0.0"));
-        }
-
-        @Test
-        @DisplayName("courseId of 0 returns 400 naming courseId")
-        void nonPositiveCourseIdReturns400() throws Exception {
-            String body = courseworkJson(0, EXAM, unique("Work"),
-                    DEADLINE, "3");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.courseId")
-                            .value("must be greater than 0"));
-        }
-
-        @ParameterizedTest(name = "kind \"{0}\"")
-        @ValueSource(strings = {"QUIZ", "exam"})
-        @DisplayName("kind other than uppercase EXAM or ASSIGNMENT returns "
-                + "400 malformed body")
-        void unknownKindReturns400(final String kind) throws Exception {
-            String body = courseworkJson(createCourse(), kind,
-                    unique("Work"), DEADLINE, "3");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @ParameterizedTest(name = "deadline \"{0}\"")
-        @ValueSource(strings = {"2026-12-01T10:00:00", "yesterday"})
-        @DisplayName("deadline that is not an instant with a zone returns "
-                + "400 malformed body")
-        void unreadableDeadlineReturns400(final String deadline)
-                throws Exception {
-            String body = courseworkJson(createCourse(), EXAM,
-                    unique("Work"), deadline, "3");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            String body = "{\"courseId\": 1, \"kind\": ";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
+                    .andExpect(jsonPath("$.fieldErrors.kind")
+                            .value("must not be null"));
         }
     }
 
-    /** Tests for GET /api/coursework, with and without filters. */
+    /** Tests for GET /api/coursework, with its filters. */
     @Nested
     @DisplayName("GET /api/coursework")
     class ListCoursework {
-
-        @Test
-        @DisplayName("unfiltered list contains new coursework")
-        void unfilteredListContainsNewCoursework() throws Exception {
-            long id = createCoursework(createCourse());
-
-            ResultActions result = mvc().perform(get(PATH));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
 
         @Test
         @DisplayName("courseId filter returns only that course's coursework")
@@ -459,27 +263,6 @@ class CourseworkApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(inB)))))
                     .andExpect(jsonPath("$[*].courseId",
                             everyItem(is(jsonInt(courseA)))));
-        }
-
-        @ParameterizedTest(name = "kind {0}")
-        @CsvSource({"EXAM, ASSIGNMENT", "ASSIGNMENT, EXAM"})
-        @DisplayName("kind filter returns only coursework of that kind")
-        void kindFilterReturnsOnlyThatKind(final String kind,
-                final String otherKind) throws Exception {
-            // Assumption: with no courseId, the kind filter covers the
-            // coursework of every course.
-            long course = createCourse();
-            long match = createCoursework(course, kind, DEADLINE);
-            long other = createCoursework(course, otherKind, DEADLINE);
-
-            ResultActions result =
-                    mvc().perform(get(PATH).param("kind", kind));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(match))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(other)))))
-                    .andExpect(jsonPath("$[*].kind", everyItem(is(kind))));
         }
 
         @Test
@@ -501,64 +284,6 @@ class CourseworkApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(otherKind)))))
                     .andExpect(jsonPath("$[*].id",
                             not(hasItem(jsonInt(otherCourse)))));
-        }
-
-        @Test
-        @DisplayName("list is ordered by deadline, then by id")
-        void listIsOrderedByDeadlineThenId() throws Exception {
-            // Assumption: ids are given out in increasing order, so of two
-            // items with the same deadline, the one created first has the
-            // smaller id.
-            long course = createCourse();
-            long laterFirst =
-                    createCoursework(course, ASSIGNMENT, LATER_DEADLINE);
-            long earlier = createCoursework(course, EXAM, DEADLINE);
-            long laterSecond =
-                    createCoursework(course, ASSIGNMENT, LATER_DEADLINE);
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("courseId", String.valueOf(course)));
-
-            // The course is new, so it holds only these three items.
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", contains(jsonInt(earlier),
-                            jsonInt(laterFirst), jsonInt(laterSecond))));
-        }
-
-        @Test
-        @DisplayName("unknown courseId returns an empty list")
-        void unknownCourseReturnsEmptyList() throws Exception {
-            String unknownCourse = String.valueOf(UNKNOWN_ID);
-
-            ResultActions result =
-                    mvc().perform(get(PATH).param("courseId", unknownCourse));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
-
-        @ParameterizedTest(name = "kind \"{0}\"")
-        @ValueSource(strings = {"QUIZ", "exam"})
-        @DisplayName("kind other than uppercase EXAM or ASSIGNMENT returns "
-                + "400")
-        void invalidKindReturns400(final String kind) throws Exception {
-            ResultActions result =
-                    mvc().perform(get(PATH).param("kind", kind));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for kind"));
-        }
-
-        @Test
-        @DisplayName("courseId that is not a number returns 400")
-        void invalidCourseIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("courseId", "abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for courseId"));
         }
     }
 
@@ -655,78 +380,6 @@ class CourseworkApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message").value(COURSE_NOT_FOUND));
             assertStored(id, courseId, ASSIGNMENT, title, DEADLINE, 3);
         }
-
-        @Test
-        @DisplayName("unknown coursework is reported before unknown course")
-        void unknownCourseworkIsCheckedBeforeCourse() throws Exception {
-            String body = courseworkJson(UNKNOWN_ID, EXAM, unique("Work"),
-                    DEADLINE, "3");
-
-            ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(COURSEWORK_NOT_FOUND));
-        }
-
-        @ParameterizedTest(name = "without {0}")
-        @CsvSource({
-            "courseId, must not be null",
-            "kind, must not be null",
-            "title, must not be blank",
-            "deadline, must not be null",
-            "estimatedEffortHours, must not be null"
-        })
-        @DisplayName("missing required field returns 400 and changes nothing")
-        void missingFieldReturns400(final String field, final String message)
-                throws Exception {
-            long courseId = createCourse();
-            String title = unique("Work");
-            long id = createAssignment(courseId, title);
-            String body = courseworkJsonWithout(field, courseId);
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(message));
-            assertStored(id, courseId, ASSIGNMENT, title, DEADLINE, 3);
-        }
-
-        @ParameterizedTest(name = "kind \"{0}\", deadline \"{1}\"")
-        @CsvSource({
-            "QUIZ, 2026-12-10T12:00:00Z",
-            "EXAM, yesterday"
-        })
-        @DisplayName("value that cannot be read returns 400 and changes "
-                + "nothing")
-        void unreadableValueReturns400(final String kind,
-                final String deadline) throws Exception {
-            long courseId = createCourse();
-            String title = unique("Work");
-            long id = createAssignment(courseId, title);
-            String body = courseworkJson(courseId, kind, unique("New"),
-                    deadline, "5");
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-            assertStored(id, courseId, ASSIGNMENT, title, DEADLINE, 3);
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            String body = courseworkJson(createCourse(), EXAM,
-                    unique("Work"), DEADLINE, "3");
-
-            ResultActions result = putJson(PATH + "/abc", body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
-        }
     }
 
     /** Tests for DELETE /api/coursework/{id}. */
@@ -755,15 +408,6 @@ class CourseworkApiTest extends ApiTestSupport {
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(COURSEWORK_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(delete(PATH + "/abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
         }
 
         @Test

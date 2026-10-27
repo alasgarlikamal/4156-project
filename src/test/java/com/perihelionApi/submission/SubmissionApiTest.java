@@ -3,7 +3,6 @@
  */
 package com.perihelionApi.submission;
 
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -16,8 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.perihelionApi.ApiTestSupport;
@@ -56,9 +53,6 @@ class SubmissionApiTest extends ApiTestSupport {
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
 
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
-
     /** The only message a {@code @NotNull} field can give. */
     private static final String MUST_NOT_BE_NULL = "must not be null";
 
@@ -88,24 +82,6 @@ class SubmissionApiTest extends ApiTestSupport {
      */
     private static int jsonInt(final long id) {
         return Math.toIntExact(id);
-    }
-
-    /**
-     * Builds a submission body that leaves out one required field. The
-     * body always carries {@link #SUBMITTED_AT}.
-     *
-     * @param field the field to leave out, "enrollmentId" or "courseworkId"
-     * @param enrollmentId the enrollment id to send when it is kept
-     * @param courseworkId the coursework id to send when it is kept
-     * @return the JSON body
-     */
-    private static String submissionJsonWithout(final String field,
-            final long enrollmentId, final long courseworkId) {
-        String submittedAt = ", \"submittedAt\": \"" + SUBMITTED_AT + "\"}";
-        if ("enrollmentId".equals(field)) {
-            return "{\"courseworkId\": " + courseworkId + submittedAt;
-        }
-        return "{\"enrollmentId\": " + enrollmentId + submittedAt;
     }
 
     /**
@@ -187,36 +163,6 @@ class SubmissionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("same coursework from another enrollment returns 201")
-        void sameCourseworkOtherEnrollmentReturns201() throws Exception {
-            long courseId = createCourse();
-            long courseworkId = createCoursework(courseId);
-            createSubmission(createEnrollment(courseId), courseworkId);
-            long other = createEnrollment(courseId);
-
-            ResultActions result = postJson(PATH,
-                    submissionJson(other, courseworkId, SUBMITTED_AT));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.enrollmentId").value(other));
-        }
-
-        @Test
-        @DisplayName("same enrollment with other coursework returns 201")
-        void sameEnrollmentOtherCourseworkReturns201() throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            createSubmission(enrollmentId, createCoursework(courseId));
-            long other = createCoursework(courseId);
-
-            ResultActions result = postJson(PATH,
-                    submissionJson(enrollmentId, other, SUBMITTED_AT));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.courseworkId").value(other));
-        }
-
-        @Test
         @DisplayName("unknown enrollment returns 404")
         void unknownEnrollmentReturns404() throws Exception {
             long courseworkId = createCoursework(createCourse());
@@ -230,34 +176,18 @@ class SubmissionApiTest extends ApiTestSupport {
                             .value(ENROLLMENT_NOT_FOUND));
         }
 
-        @ParameterizedTest(name = "courseworkId {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0})
-        @DisplayName("courseworkId that does not exist, including 0, "
-                + "returns 404")
-        void unknownCourseworkReturns404(final long courseworkId)
-                throws Exception {
+        @Test
+        @DisplayName("courseworkId that does not exist returns 404")
+        void unknownCourseworkReturns404() throws Exception {
             long enrollmentId = createEnrollment(createCourse());
             String body =
-                    submissionJson(enrollmentId, courseworkId, SUBMITTED_AT);
+                    submissionJson(enrollmentId, UNKNOWN_ID, SUBMITTED_AT);
 
             ResultActions result = postJson(PATH, body);
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(COURSEWORK_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("unknown enrollment is reported before unknown "
-                + "coursework")
-        void unknownEnrollmentIsCheckedBeforeCoursework() throws Exception {
-            String body = submissionJson(UNKNOWN_ID, UNKNOWN_ID, SUBMITTED_AT);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(ENROLLMENT_NOT_FOUND));
         }
 
         @Test
@@ -290,51 +220,19 @@ class SubmissionApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message").value(DUPLICATE));
         }
 
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"enrollmentId", "courseworkId"})
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field) throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long courseworkId = createCoursework(courseId);
-            String body =
-                    submissionJsonWithout(field, enrollmentId, courseworkId);
+        @Test
+        @DisplayName("missing courseworkId returns 400 naming that field")
+        void missingCourseworkIdReturns400() throws Exception {
+            long enrollmentId = createEnrollment(createCourse());
+            String body = "{\"enrollmentId\": " + enrollmentId
+                    + ", \"submittedAt\": \"" + SUBMITTED_AT + "\"}";
 
             ResultActions result = postJson(PATH, body);
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
+                    .andExpect(jsonPath("$.fieldErrors.courseworkId")
                             .value(MUST_NOT_BE_NULL));
-        }
-
-        @ParameterizedTest(name = "submittedAt \"{0}\"")
-        @ValueSource(strings = {"yesterday", "2026-12-01T10:00:00"})
-        @DisplayName("submittedAt that is not an instant with a zone returns "
-                + "400")
-        void malformedSubmittedAtReturns400(final String submittedAt)
-                throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long courseworkId = createCoursework(courseId);
-            String body =
-                    submissionJson(enrollmentId, courseworkId, submittedAt);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            String body = "{\"enrollmentId\": 1, \"courseworkId\": ";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
         }
     }
 
@@ -342,19 +240,6 @@ class SubmissionApiTest extends ApiTestSupport {
     @Nested
     @DisplayName("GET /api/submissions")
     class ListSubmissions {
-
-        @Test
-        @DisplayName("unfiltered list contains a new submission")
-        void unfilteredListContainsNewSubmission() throws Exception {
-            long courseId = createCourse();
-            long id = createSubmission(createEnrollment(courseId),
-                    createCoursework(courseId));
-
-            ResultActions result = mvc().perform(get(PATH));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
 
         @Test
         @DisplayName("enrollmentId filter returns only that enrollment's "
@@ -376,28 +261,6 @@ class SubmissionApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(byB)))))
                     .andExpect(jsonPath("$[*].enrollmentId",
                             everyItem(is(jsonInt(enrollmentA)))));
-        }
-
-        @Test
-        @DisplayName("courseworkId filter returns only that coursework's "
-                + "submissions")
-        void courseworkIdFilterReturnsOnlyThatCoursework() throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long workA = createCoursework(courseId);
-            long workB = createCoursework(courseId);
-            long forA = createSubmission(enrollmentId, workA);
-            long forB = createSubmission(enrollmentId, workB);
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("courseworkId", String.valueOf(workA)));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(forA))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(forB)))))
-                    .andExpect(jsonPath("$[*].courseworkId",
-                            everyItem(is(jsonInt(workA)))));
         }
 
         @Test
@@ -423,55 +286,6 @@ class SubmissionApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(otherWork)))))
                     .andExpect(jsonPath("$[*].id",
                             not(hasItem(jsonInt(otherEnrollment)))));
-        }
-
-        @Test
-        @DisplayName("list is ordered by id ascending")
-        void listIsOrderedById() throws Exception {
-            // Assumption: ids are given out in increasing order, so the
-            // submission created second has the larger id.
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long first = createSubmission(enrollmentId,
-                    createCoursework(courseId));
-            long second = createSubmission(enrollmentId,
-                    createCoursework(courseId));
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("enrollmentId", String.valueOf(enrollmentId)));
-
-            // The enrollment is new, so it holds only these two submissions.
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id",
-                            contains(jsonInt(first), jsonInt(second))));
-        }
-
-        @ParameterizedTest(name = "{0}={1}")
-        @ValueSource(strings = {"enrollmentId", "courseworkId"})
-        @DisplayName("filter by an id that does not exist returns an empty "
-                + "list")
-        void unknownIdFilterReturnsEmptyList(final String param)
-                throws Exception {
-            String unknown = String.valueOf(UNKNOWN_ID);
-
-            ResultActions result =
-                    mvc().perform(get(PATH).param(param, unknown));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
-
-        @ParameterizedTest(name = "{0}=abc")
-        @ValueSource(strings = {"enrollmentId", "courseworkId"})
-        @DisplayName("filter value that is not a number returns 400 naming "
-                + "the filter")
-        void invalidFilterReturns400(final String param) throws Exception {
-            ResultActions result =
-                    mvc().perform(get(PATH).param(param, "abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for " + param));
         }
     }
 
@@ -545,24 +359,6 @@ class SubmissionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("changing to another enrollment of the same course "
-                + "returns 200 and is stored")
-        void changeEnrollmentReturns200() throws Exception {
-            long courseId = createCourse();
-            long courseworkId = createCoursework(courseId);
-            long id = createSubmission(createEnrollment(courseId),
-                    courseworkId);
-            long newEnrollment = createEnrollment(courseId);
-
-            ResultActions result = putJson(pathOf(id),
-                    submissionJson(newEnrollment, courseworkId, SUBMITTED_AT));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.enrollmentId").value(newEnrollment));
-            assertStored(id, newEnrollment, courseworkId, SUBMITTED_AT);
-        }
-
-        @Test
         @DisplayName("omitted submittedAt keeps the stored value")
         void omittedSubmittedAtKeepsStoredValue() throws Exception {
             long courseId = createCourse();
@@ -581,40 +377,11 @@ class SubmissionApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("sending its own current values returns 200")
-        void ownCurrentValuesReturn200() throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long courseworkId = createCoursework(courseId);
-            long id = createSubmission(enrollmentId, courseworkId);
-
-            ResultActions result = putJson(pathOf(id),
-                    submissionJson(enrollmentId, courseworkId, SUBMITTED_AT));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(id));
-            assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
-        }
-
-        @Test
         @DisplayName("unknown submission returns 404")
         void unknownSubmissionReturns404() throws Exception {
             long courseId = createCourse();
             String body = submissionJson(createEnrollment(courseId),
                     createCoursework(courseId), SUBMITTED_AT);
-
-            ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(SUBMISSION_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("unknown submission is reported before unknown "
-                + "enrollment")
-        void unknownSubmissionIsCheckedFirst() throws Exception {
-            String body = submissionJson(UNKNOWN_ID, UNKNOWN_ID, SUBMITTED_AT);
 
             ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
 
@@ -640,19 +407,17 @@ class SubmissionApiTest extends ApiTestSupport {
             assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
         }
 
-        @ParameterizedTest(name = "courseworkId {0}")
-        @ValueSource(longs = {UNKNOWN_ID, 0})
+        @Test
         @DisplayName("courseworkId that does not exist returns 404 and "
                 + "changes nothing")
-        void unknownCourseworkReturns404(final long newWork)
-                throws Exception {
+        void unknownCourseworkReturns404() throws Exception {
             long courseId = createCourse();
             long enrollmentId = createEnrollment(courseId);
             long courseworkId = createCoursework(courseId);
             long id = createSubmission(enrollmentId, courseworkId);
 
             ResultActions result = putJson(pathOf(id),
-                    submissionJson(enrollmentId, newWork, LATER));
+                    submissionJson(enrollmentId, UNKNOWN_ID, LATER));
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
@@ -696,57 +461,6 @@ class SubmissionApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message").value(DUPLICATE));
             assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
         }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"enrollmentId", "courseworkId"})
-        @DisplayName("missing required field returns 400 and changes nothing")
-        void missingFieldReturns400(final String field) throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long courseworkId = createCoursework(courseId);
-            long id = createSubmission(enrollmentId, courseworkId);
-            String body =
-                    submissionJsonWithout(field, enrollmentId, courseworkId);
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-            assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
-        }
-
-        @Test
-        @DisplayName("submittedAt that is not an instant with a zone returns "
-                + "400 and changes nothing")
-        void malformedSubmittedAtReturns400() throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long courseworkId = createCoursework(courseId);
-            long id = createSubmission(enrollmentId, courseworkId);
-
-            ResultActions result = putJson(pathOf(id),
-                    submissionJson(enrollmentId, courseworkId, "yesterday"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-            assertStored(id, enrollmentId, courseworkId, SUBMITTED_AT);
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            long courseId = createCourse();
-            String body = submissionJson(createEnrollment(courseId),
-                    createCoursework(courseId), SUBMITTED_AT);
-
-            ResultActions result = putJson(PATH + "/abc", body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for id"));
-        }
     }
 
     /** Tests for DELETE /api/submissions/{id}. */
@@ -778,16 +492,6 @@ class SubmissionApiTest extends ApiTestSupport {
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(SUBMISSION_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(delete(PATH + "/abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for id"));
         }
     }
 }

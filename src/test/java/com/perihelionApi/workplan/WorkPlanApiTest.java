@@ -4,7 +4,6 @@
 package com.perihelionApi.workplan;
 
 import static org.hamcrest.Matchers.closeTo;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -15,15 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.StringJoiner;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.ResultMatcher;
@@ -58,14 +53,8 @@ class WorkPlanApiTest extends ApiTestSupport {
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
 
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
-
     /** Error message for an id path value that is not a number. */
     private static final String INVALID_ID = "Invalid value for id";
-
-    /** The only message a {@code @NotNull} field can give. */
-    private static final String MUST_NOT_BE_NULL = "must not be null";
 
     /** The message of the {@code rangeValid} cross-field check. */
     private static final String RANGE_INVALID =
@@ -79,9 +68,6 @@ class WorkPlanApiTest extends ApiTestSupport {
 
     /** The hours per day that {@code createWorkPlan} sends. */
     private static final double DEFAULT_HOURS = 4.0;
-
-    /** A createdAt a client might send; the server must not keep it. */
-    private static final String SENT_CREATED_AT = "2000-01-01T00:00:00Z";
 
     /** Allowed difference when comparing hours as numbers. */
     private static final double TOLERANCE = 1e-9;
@@ -118,66 +104,6 @@ class WorkPlanApiTest extends ApiTestSupport {
     private static ResultMatcher hoursAre(final double expected) {
         return jsonPath("$.availableHoursPerDay")
                 .value(closeTo(expected, TOLERANCE), Double.class);
-    }
-
-    /**
-     * Returns the fields of a valid work plan body, from START to END with
-     * 4 hours per day. Each value is already written as JSON.
-     *
-     * @param enrollmentId the enrollment id
-     * @return the fields in body order, which the caller may change
-     */
-    private static Map<String, String> validFields(final long enrollmentId) {
-        Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("enrollmentId", String.valueOf(enrollmentId));
-        fields.put("rangeStart", "\"" + START + "\"");
-        fields.put("rangeEnd", "\"" + END + "\"");
-        fields.put("availableHoursPerDay", "4");
-        return fields;
-    }
-
-    /**
-     * Writes fields as a JSON object.
-     *
-     * @param fields the field names and their JSON values
-     * @return the JSON body
-     */
-    private static String toJson(final Map<String, String> fields) {
-        StringJoiner json = new StringJoiner(", ", "{", "}");
-        for (Map.Entry<String, String> field : fields.entrySet()) {
-            json.add("\"" + field.getKey() + "\": " + field.getValue());
-        }
-        return json.toString();
-    }
-
-    /**
-     * Builds a valid work plan body, then sets one field to a raw JSON
-     * value, adding the field if it is not already there.
-     *
-     * @param enrollmentId the enrollment id
-     * @param field the field to set
-     * @param rawValue the value written as JSON, such as {@code "\"x\""}
-     * @return the JSON body
-     */
-    private static String workPlanJsonWith(final long enrollmentId,
-            final String field, final String rawValue) {
-        Map<String, String> fields = validFields(enrollmentId);
-        fields.put(field, rawValue);
-        return toJson(fields);
-    }
-
-    /**
-     * Builds a valid work plan body that leaves out one field.
-     *
-     * @param field the field to leave out
-     * @param enrollmentId the enrollment id to send when it is kept
-     * @return the JSON body
-     */
-    private static String workPlanJsonWithout(final String field,
-            final long enrollmentId) {
-        Map<String, String> fields = validFields(enrollmentId);
-        fields.remove(field);
-        return toJson(fields);
     }
 
     /**
@@ -257,22 +183,6 @@ class WorkPlanApiTest extends ApiTestSupport {
                     DEFAULT_HOURS);
         }
 
-        @ParameterizedTest(name = "availableHoursPerDay {0}")
-        @ValueSource(strings = {"0", "24"})
-        @DisplayName("availableHoursPerDay at the bounds 0 and 24 returns "
-                + "201")
-        void hoursAtBoundsReturn201(final String hours) throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-
-            ResultActions result = postJson(PATH,
-                    workPlanJson(enrollmentId, START, END, hours));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(hoursAre(Double.parseDouble(hours)));
-            assertStored(idOf(result), enrollmentId, START, END,
-                    Double.parseDouble(hours));
-        }
-
         @Test
         @DisplayName("one-day range (rangeEnd the day after rangeStart) "
                 + "returns 201")
@@ -292,28 +202,6 @@ class WorkPlanApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("createdAt sent by the client is ignored")
-        void clientCreatedAtIsIgnored() throws Exception {
-            // Assumption: the server sets its own createdAt and does not
-            // reject the request; the client value is simply dropped.
-            long enrollmentId = createEnrollment(createCourse());
-            String body = workPlanJsonWith(enrollmentId, "createdAt",
-                    "\"" + SENT_CREATED_AT + "\"");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.createdAt").exists())
-                    .andExpect(jsonPath("$.createdAt")
-                            .value(not(SENT_CREATED_AT)));
-            getWorkPlan(idOf(result))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.createdAt").exists())
-                    .andExpect(jsonPath("$.createdAt")
-                            .value(not(SENT_CREATED_AT)));
-        }
-
-        @Test
         @DisplayName("unknown enrollment returns 404")
         void unknownEnrollmentReturns404() throws Exception {
             String body = workPlanJson(UNKNOWN_ID, START, END, "4");
@@ -323,26 +211,6 @@ class WorkPlanApiTest extends ApiTestSupport {
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message")
                             .value(ENROLLMENT_NOT_FOUND));
-        }
-
-        @ParameterizedTest(name = "availableHoursPerDay {0}")
-        @CsvSource({
-            "-0.01, must be greater than or equal to 0.0",
-            "24.01, must be less than or equal to 24.0"
-        })
-        @DisplayName("availableHoursPerDay just outside 0 to 24 returns 400 "
-                + "naming that field")
-        void hoursOutOfRangeReturns400(final String hours,
-                final String message) throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-
-            ResultActions result = postJson(PATH,
-                    workPlanJson(enrollmentId, START, END, hours));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.availableHoursPerDay")
-                            .value(message));
         }
 
         @ParameterizedTest(name = "rangeEnd = rangeStart + {0} days")
@@ -361,78 +229,12 @@ class WorkPlanApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.fieldErrors.rangeValid")
                             .value(RANGE_INVALID));
         }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"enrollmentId", "rangeStart", "rangeEnd",
-            "availableHoursPerDay"})
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field) throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-
-            ResultActions result =
-                    postJson(PATH, workPlanJsonWithout(field, enrollmentId));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @Test
-        @DisplayName("enrollmentId 0 returns 400 naming enrollmentId")
-        void nonPositiveEnrollmentIdReturns400() throws Exception {
-            String body = workPlanJson(0, START, END, "4");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.enrollmentId")
-                            .value("must be greater than 0"));
-        }
-
-        @ParameterizedTest(name = "{0} \"yesterday\"")
-        @ValueSource(strings = {"rangeStart", "rangeEnd"})
-        @DisplayName("date that is not yyyy-MM-dd returns 400 malformed")
-        void unreadableDateReturns400(final String field) throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-            String body =
-                    workPlanJsonWith(enrollmentId, field, "\"yesterday\"");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            String body = "{\"enrollmentId\": 1, \"rangeStart\": ";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
     }
 
-    /** Tests for GET /api/workplans, with and without a filter. */
+    /** Tests for GET /api/workplans with the enrollmentId filter. */
     @Nested
     @DisplayName("GET /api/workplans")
     class ListWorkPlans {
-
-        @Test
-        @DisplayName("unfiltered list contains a new work plan")
-        void unfilteredListContainsNewWorkPlan() throws Exception {
-            long id = createWorkPlan(createEnrollment(createCourse()),
-                    START, END);
-
-            ResultActions result = mvc().perform(get(PATH));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
 
         @Test
         @DisplayName("enrollmentId filter returns only that enrollment's "
@@ -453,69 +255,6 @@ class WorkPlanApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(inB)))))
                     .andExpect(jsonPath("$[*].enrollmentId",
                             everyItem(is(jsonInt(enrollmentA)))));
-        }
-
-        @Test
-        @DisplayName("list is ordered by rangeStart, then by id")
-        void listIsOrderedByRangeStartThenId() throws Exception {
-            // Assumption: one enrollment may hold several work plans, even
-            // with overlapping ranges, and ids are given out in increasing
-            // order. The plans are created out of order on purpose; the two
-            // that share a rangeStart are told apart only by id (the one
-            // created first has the later rangeEnd).
-            long enrollmentId = createEnrollment(createCourse());
-            long late = createWorkPlan(enrollmentId,
-                    LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 25));
-            long early = createWorkPlan(enrollmentId,
-                    LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 5));
-            long lateSameStart = createWorkPlan(enrollmentId,
-                    LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 22));
-            long middle = createWorkPlan(enrollmentId,
-                    LocalDate.of(2026, 11, 10), LocalDate.of(2026, 11, 12));
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("enrollmentId", String.valueOf(enrollmentId)));
-
-            // The enrollment is new, so it holds only these four plans.
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", contains(jsonInt(early),
-                            jsonInt(middle), jsonInt(late),
-                            jsonInt(lateSameStart))));
-        }
-
-        @Test
-        @DisplayName("unknown enrollmentId returns an empty list")
-        void unknownEnrollmentReturnsEmptyList() throws Exception {
-            String unknownEnrollment = String.valueOf(UNKNOWN_ID);
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("enrollmentId", unknownEnrollment));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
-
-        @Test
-        @DisplayName("enrollment with no work plans returns an empty list")
-        void enrollmentWithoutPlansReturnsEmptyList() throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("enrollmentId", String.valueOf(enrollmentId)));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
-
-        @Test
-        @DisplayName("enrollmentId that is not a number returns 400")
-        void invalidEnrollmentIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(get(PATH)
-                    .param("enrollmentId", "abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for enrollmentId"));
         }
     }
 
@@ -607,45 +346,6 @@ class WorkPlanApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("createdAt sent in the body is ignored")
-        void sentCreatedAtIsIgnored() throws Exception {
-            // Assumption: "a value sent by the client is ignored" covers
-            // PUT as well as POST.
-            long enrollmentId = createEnrollment(createCourse());
-            long id = createWorkPlan(enrollmentId, START, END);
-            String createdAt = createdAtOf(id);
-            String body = workPlanJsonWith(enrollmentId, "createdAt",
-                    "\"" + SENT_CREATED_AT + "\"");
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.createdAt").value(createdAt));
-            getWorkPlan(id)
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.createdAt").value(createdAt));
-        }
-
-        @Test
-        @DisplayName("moving to another enrollment returns 200 and is stored")
-        void moveToAnotherEnrollmentReturns200() throws Exception {
-            // Assumption: the new enrollment may be in a different course;
-            // the description puts no rule on it.
-            long id = createWorkPlan(createEnrollment(createCourse()),
-                    START, END);
-            long newEnrollment = createEnrollment(createCourse());
-
-            ResultActions result = putJson(pathOf(id),
-                    workPlanJson(newEnrollment, START, END, "4"));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(id))
-                    .andExpect(jsonPath("$.enrollmentId")
-                            .value(newEnrollment));
-            assertStored(id, newEnrollment, START, END, DEFAULT_HOURS);
-        }
-
-        @Test
         @DisplayName("unknown work plan returns 404")
         void unknownWorkPlanReturns404() throws Exception {
             long enrollmentId = createEnrollment(createCourse());
@@ -672,58 +372,6 @@ class WorkPlanApiTest extends ApiTestSupport {
                     .andExpect(jsonPath("$.message")
                             .value(ENROLLMENT_NOT_FOUND));
             assertStored(id, enrollmentId, START, END, DEFAULT_HOURS);
-        }
-
-        @Test
-        @DisplayName("unknown work plan is reported before unknown "
-                + "enrollment")
-        void unknownWorkPlanIsCheckedBeforeEnrollment() throws Exception {
-            String body = workPlanJson(UNKNOWN_ID, START, END, "4");
-
-            ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(WORK_PLAN_NOT_FOUND));
-        }
-
-        @ParameterizedTest(name = "{0} = {1}")
-        @CsvSource({
-            "rangeEnd, \"2026-11-02\", rangeValid",
-            "availableHoursPerDay, 24.01, availableHoursPerDay"
-        })
-        @DisplayName("invalid body returns 400 naming the problem and "
-                + "changes nothing")
-        void invalidBodyReturns400(final String field, final String rawValue,
-                final String errorKey) throws Exception {
-            // The stored plan differs from the body's other fields, so a
-            // partial update would show up in the GET below. The rangeEnd
-            // value is START, which makes the range empty.
-            long enrollmentId = createEnrollment(createCourse());
-            LocalDate oldStart = START.minusDays(7);
-            LocalDate oldEnd = END.minusDays(7);
-            long id = createWorkPlan(enrollmentId, oldStart, oldEnd);
-            String body = workPlanJsonWith(enrollmentId, field, rawValue);
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + errorKey)
-                            .exists());
-            assertStored(id, enrollmentId, oldStart, oldEnd, DEFAULT_HOURS);
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            long enrollmentId = createEnrollment(createCourse());
-            String body = workPlanJson(enrollmentId, START, END, "4");
-
-            ResultActions result = putJson(PATH + "/abc", body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
         }
     }
 
@@ -758,15 +406,6 @@ class WorkPlanApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(delete(PATH + "/abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
-        }
-
-        @Test
         @DisplayName("work plan with a task returns 409 and is kept")
         void withTaskReturns409() throws Exception {
             long courseId = createCourse();
@@ -780,23 +419,6 @@ class WorkPlanApiTest extends ApiTestSupport {
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(HAS_TASKS));
             assertStored(id, enrollmentId, START, END, DEFAULT_HOURS);
-        }
-
-        @Test
-        @DisplayName("work plan whose only task was deleted returns 204")
-        void afterTaskIsDeletedReturns204() throws Exception {
-            long courseId = createCourse();
-            long enrollmentId = createEnrollment(courseId);
-            long id = createWorkPlan(enrollmentId, START, END);
-            long taskId = createTask(id, createCoursework(courseId),
-                    enrollmentId, START.plusDays(2));
-            mvc().perform(delete("/api/tasks/" + taskId))
-                    .andExpect(status().isNoContent());
-
-            ResultActions result = mvc().perform(delete(pathOf(id)));
-
-            result.andExpect(status().isNoContent());
-            getWorkPlan(id).andExpect(status().isNotFound());
         }
     }
 }

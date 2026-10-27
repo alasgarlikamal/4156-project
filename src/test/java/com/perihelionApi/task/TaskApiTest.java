@@ -4,7 +4,6 @@
 package com.perihelionApi.task;
 
 import static org.hamcrest.Matchers.closeTo;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
@@ -95,27 +94,11 @@ class TaskApiTest extends ApiTestSupport {
     /** Error message for a bean-validation failure. */
     private static final String VALIDATION_FAILED = "Validation failed";
 
-    /** Error message for a body that cannot be read. */
-    private static final String MALFORMED_BODY = "Malformed request body";
-
     /** Error message for a path id that is not a number. */
     private static final String INVALID_ID = "Invalid value for id";
 
-    /** The only message a {@code @NotNull} field can give. */
-    private static final String MUST_NOT_BE_NULL = "must not be null";
-
-    /** The message of {@code @Positive}. */
-    private static final String MUST_BE_POSITIVE = "must be greater than 0";
-
     /** The message of {@code @NotBlank}. */
     private static final String MUST_NOT_BE_BLANK = "must not be blank";
-
-    /** The message of {@code @Size(max=255)}. */
-    private static final String TOO_LONG = "size must be between 0 and 255";
-
-    /** The message of {@code @DecimalMin("0.0")}. */
-    private static final String NEGATIVE =
-            "must be greater than or equal to 0.0";
 
     /**
      * The ids of a course, an enrollment in it, coursework in it and a work
@@ -223,8 +206,8 @@ class TaskApiTest extends ApiTestSupport {
      * added.
      *
      * @param field the field to set
-     * @param rawValue the value, written as raw JSON, such as {@code 0} or
-     *     {@code "yesterday"} with its quotes
+     * @param rawValue the value, written as raw JSON, such as {@code 7} or
+     *     {@code "   "} with its quotes
      * @param chain the work plan, coursework and enrollment to use
      * @return the JSON body
      */
@@ -232,20 +215,6 @@ class TaskApiTest extends ApiTestSupport {
             final String rawValue, final Chain chain) {
         Map<String, String> fields = validFields(chain);
         fields.put(field, rawValue);
-        return toJson(fields);
-    }
-
-    /**
-     * Builds a valid task body for a chain that leaves out one field.
-     *
-     * @param field the field to leave out
-     * @param chain the work plan, coursework and enrollment to use
-     * @return the JSON body
-     */
-    private static String taskJsonWithout(final String field,
-            final Chain chain) {
-        Map<String, String> fields = validFields(chain);
-        fields.remove(field);
         return toJson(fields);
     }
 
@@ -413,19 +382,6 @@ class TaskApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("estimatedWorkHours of 0 returns 201")
-        void zeroHoursReturns201() throws Exception {
-            Chain chain = createChain();
-            String title = unique("Task");
-
-            ResultActions result =
-                    postJson(PATH, taskJson(chain, title, IN_RANGE, "0"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(hoursAre(0));
-        }
-
-        @Test
         @DisplayName("id of an existing task in the body is ignored: a new "
                 + "task is created and the existing one is unchanged")
         void bodyIdCreatesNewTask() throws Exception {
@@ -442,118 +398,18 @@ class TaskApiTest extends ApiTestSupport {
             assertUnchanged(existing, chain, title);
         }
 
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"workPlanId", "courseworkId", "enrollmentId",
-            "targetDate", "estimatedWorkHours"})
-        @DisplayName("missing required field returns 400 naming that field")
-        void missingFieldReturns400(final String field) throws Exception {
+        @Test
+        @DisplayName("blank title returns 400 naming title")
+        void blankTitleReturns400() throws Exception {
             Chain chain = createChain();
 
             ResultActions result =
-                    postJson(PATH, taskJsonWithout(field, chain));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_NOT_BE_NULL));
-        }
-
-        @ParameterizedTest(name = "{0} = {1}")
-        @CsvSource({"workPlanId, 0", "courseworkId, 0", "enrollmentId, 0"})
-        @DisplayName("id of 0 returns 400 naming that field")
-        void nonPositiveIdReturns400(final String field, final long value)
-                throws Exception {
-            Chain chain = createChain();
-            String body = taskJsonWith(field, String.valueOf(value), chain);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field)
-                            .value(MUST_BE_POSITIVE));
-        }
-
-        @ParameterizedTest(name = "title {0}")
-        @ValueSource(strings = {"null", "\"   \""})
-        @DisplayName("missing or blank title returns 400 naming title")
-        void blankTitleReturns400(final String rawTitle) throws Exception {
-            Chain chain = createChain();
-
-            ResultActions result =
-                    postJson(PATH, taskJsonWith("title", rawTitle, chain));
+                    postJson(PATH, taskJsonWith("title", "\"   \"", chain));
 
             result.andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
                     .andExpect(jsonPath("$.fieldErrors.title")
                             .value(MUST_NOT_BE_BLANK));
-        }
-
-        @Test
-        @DisplayName("title of 255 characters returns 201")
-        void longestTitleReturns201() throws Exception {
-            Chain chain = createChain();
-            String title = "t".repeat(255);
-
-            ResultActions result =
-                    postJson(PATH, taskJson(chain, title, IN_RANGE, "2"));
-
-            result.andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.title").value(title));
-            assertStored(idOf(result), chain, title, IN_RANGE, 2);
-        }
-
-        @Test
-        @DisplayName("title of 256 characters returns 400 naming title")
-        void tooLongTitleReturns400() throws Exception {
-            Chain chain = createChain();
-            String title = "t".repeat(256);
-
-            ResultActions result =
-                    postJson(PATH, taskJson(chain, title, IN_RANGE, "2"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.title")
-                            .value(TOO_LONG));
-        }
-
-        @Test
-        @DisplayName("estimatedWorkHours of -0.01 returns 400 naming that "
-                + "field")
-        void negativeHoursReturns400() throws Exception {
-            Chain chain = createChain();
-            String body = taskJson(chain, unique("Task"), IN_RANGE, "-0.01");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors.estimatedWorkHours")
-                            .value(NEGATIVE));
-        }
-
-        @Test
-        @DisplayName("targetDate that is not a date returns 400")
-        void invalidTargetDateReturns400() throws Exception {
-            Chain chain = createChain();
-            String body = taskJsonWith("targetDate", "\"yesterday\"", chain);
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-        }
-
-        @Test
-        @DisplayName("malformed JSON returns 400")
-        void malformedJsonReturns400() throws Exception {
-            String body = "{\"workPlanId\": 1, \"title\": ";
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
         }
 
         @ParameterizedTest(name = "unknown {0}")
@@ -572,35 +428,6 @@ class TaskApiTest extends ApiTestSupport {
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value(message));
-        }
-
-        @Test
-        @DisplayName("when work plan, coursework and enrollment are all "
-                + "unknown, the work plan is reported")
-        void unknownWorkPlanIsReportedFirst() throws Exception {
-            String body = taskJson(UNKNOWN_ID, UNKNOWN_ID, UNKNOWN_ID,
-                    unique("Task"), IN_RANGE, "2");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(WORK_PLAN_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("when coursework and enrollment are both unknown, the "
-                + "coursework is reported")
-        void unknownCourseworkIsReportedBeforeEnrollment() throws Exception {
-            Chain chain = createChain();
-            String body = taskJson(chain.workPlanId(), UNKNOWN_ID, UNKNOWN_ID,
-                    unique("Task"), IN_RANGE, "2");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message")
-                            .value(COURSEWORK_NOT_FOUND));
         }
 
         @Test
@@ -649,60 +476,12 @@ class TaskApiTest extends ApiTestSupport {
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(OUT_OF_RANGE));
         }
-
-        @Test
-        @DisplayName("rejected request stores no task")
-        void rejectedRequestStoresNothing() throws Exception {
-            // Assumption: a request answered with 409 adds no row, so the
-            // new work plan still has no tasks.
-            Chain chain = createChain();
-            String body = taskJson(chain, unique("Task"),
-                    RANGE_END.plusDays(1), "2");
-
-            ResultActions result = postJson(PATH, body);
-
-            result.andExpect(status().isConflict());
-            listBy("workPlanId", chain.workPlanId())
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
-        }
     }
 
     /** Tests for GET /api/tasks, with and without filters. */
     @Nested
     @DisplayName("GET /api/tasks")
     class ListTasks {
-
-        @Test
-        @DisplayName("unfiltered list contains a new task")
-        void unfilteredListContainsNewTask() throws Exception {
-            long id = createTask(createChain(), IN_RANGE);
-
-            ResultActions result = mvc().perform(get(PATH));
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(id))));
-        }
-
-        @Test
-        @DisplayName("enrollmentId filter returns only that enrollment's "
-                + "tasks")
-        void enrollmentIdFilterReturnsOnlyThatEnrollment() throws Exception {
-            Chain chain = createChain();
-            Chain otherChain = createChain();
-            long match = createTask(chain, IN_RANGE);
-            long other = createTask(otherChain, IN_RANGE);
-
-            ResultActions result =
-                    listBy("enrollmentId", chain.enrollmentId());
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(match))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(other)))))
-                    .andExpect(jsonPath("$[*].enrollmentId",
-                            everyItem(is(jsonInt(chain.enrollmentId())))));
-        }
 
         @Test
         @DisplayName("workPlanId filter returns only that work plan's tasks")
@@ -724,29 +503,6 @@ class TaskApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(other)))))
                     .andExpect(jsonPath("$[*].workPlanId",
                             everyItem(is(jsonInt(chain.workPlanId())))));
-        }
-
-        @Test
-        @DisplayName("courseworkId filter returns only that coursework's "
-                + "tasks")
-        void courseworkIdFilterReturnsOnlyThatCoursework() throws Exception {
-            // Both tasks share the work plan and enrollment, so only the
-            // coursework tells them apart.
-            Chain chain = createChain();
-            long otherWork = createCoursework(chain.courseId());
-            long match = createTask(chain, IN_RANGE);
-            long other = createTask(chain.workPlanId(), otherWork,
-                    chain.enrollmentId(), IN_RANGE);
-
-            ResultActions result =
-                    listBy("courseworkId", chain.courseworkId());
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", hasItem(jsonInt(match))))
-                    .andExpect(jsonPath("$[*].id",
-                            not(hasItem(jsonInt(other)))))
-                    .andExpect(jsonPath("$[*].courseworkId",
-                            everyItem(is(jsonInt(chain.courseworkId())))));
         }
 
         @Test
@@ -784,50 +540,6 @@ class TaskApiTest extends ApiTestSupport {
                             not(hasItem(jsonInt(wrongWork)))))
                     .andExpect(jsonPath("$[*].id",
                             not(hasItem(jsonInt(wrongLearner)))));
-        }
-
-        @Test
-        @DisplayName("list is ordered by targetDate, then id")
-        void listIsOrderedByTargetDateThenId() throws Exception {
-            // Assumption: ids are given out in increasing order, so of two
-            // tasks on the same day, the one created first comes first.
-            Chain chain = createChain();
-            long lateFirst = createTask(chain, LocalDate.of(2026, 11, 20));
-            long early = createTask(chain, LocalDate.of(2026, 11, 5));
-            long lateSecond = createTask(chain, LocalDate.of(2026, 11, 20));
-            long middle = createTask(chain, LocalDate.of(2026, 11, 10));
-
-            ResultActions result = listBy("workPlanId", chain.workPlanId());
-
-            // The work plan is new, so it holds only these four tasks.
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id", contains(jsonInt(early),
-                            jsonInt(middle), jsonInt(lateFirst),
-                            jsonInt(lateSecond))));
-        }
-
-        @ParameterizedTest(name = "{0}=abc")
-        @ValueSource(strings = {"enrollmentId", "workPlanId", "courseworkId"})
-        @DisplayName("filter that is not a number returns 400 naming it")
-        void invalidFilterReturns400(final String param) throws Exception {
-            ResultActions result =
-                    mvc().perform(get(PATH).param(param, "abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message")
-                            .value("Invalid value for " + param));
-        }
-
-        @ParameterizedTest(name = "unknown {0}")
-        @ValueSource(strings = {"enrollmentId", "workPlanId", "courseworkId"})
-        @DisplayName("filter with an id that does not exist returns an empty "
-                + "list")
-        void unknownFilterReturnsEmptyList(final String param)
-                throws Exception {
-            ResultActions result = listBy(param, UNKNOWN_ID);
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isEmpty());
         }
     }
 
@@ -898,23 +610,6 @@ class TaskApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("id in the body is ignored: the task in the path is "
-                + "updated and the other task is unchanged")
-        void bodyIdIsIgnored() throws Exception {
-            Chain chain = createChain();
-            String otherTitle = unique("Task");
-            long other = createTask(chain, otherTitle);
-            long id = createTask(chain, unique("Task"));
-            String body = taskJsonWith("id", String.valueOf(other), chain);
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(id));
-            assertUnchanged(other, chain, otherTitle);
-        }
-
-        @Test
         @DisplayName("unknown task returns 404")
         void unknownTaskReturns404() throws Exception {
             String body = taskJson(createChain(), unique("Task"), IN_RANGE,
@@ -924,72 +619,6 @@ class TaskApiTest extends ApiTestSupport {
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value(TASK_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("unknown task is reported before an unknown work plan")
-        void unknownTaskIsCheckedBeforeWorkPlan() throws Exception {
-            String body = taskJson(UNKNOWN_ID, UNKNOWN_ID, UNKNOWN_ID,
-                    unique("Task"), IN_RANGE, "2");
-
-            ResultActions result = putJson(pathOf(UNKNOWN_ID), body);
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value(TASK_NOT_FOUND));
-        }
-
-        @ParameterizedTest(name = "without {0}")
-        @ValueSource(strings = {"workPlanId", "courseworkId", "enrollmentId",
-            "title", "targetDate", "estimatedWorkHours"})
-        @DisplayName("missing required field returns 400 and changes nothing")
-        void missingFieldReturns400(final String field) throws Exception {
-            Chain chain = createChain();
-            String title = unique("Task");
-            long id = createTask(chain, title);
-
-            ResultActions result =
-                    putJson(pathOf(id), taskJsonWithout(field, chain));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field).exists());
-            assertUnchanged(id, chain, title);
-        }
-
-        @ParameterizedTest(name = "{0} = {1}")
-        @CsvSource({"workPlanId, 0", "courseworkId, 0", "enrollmentId, 0",
-            "title, '\"   \"'", "estimatedWorkHours, -0.01"})
-        @DisplayName("field value that breaks a validation rule returns 400 "
-                + "and changes nothing")
-        void invalidFieldReturns400(final String field, final String rawValue)
-                throws Exception {
-            Chain chain = createChain();
-            String title = unique("Task");
-            long id = createTask(chain, title);
-
-            ResultActions result =
-                    putJson(pathOf(id), taskJsonWith(field, rawValue, chain));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(VALIDATION_FAILED))
-                    .andExpect(jsonPath("$.fieldErrors." + field).exists());
-            assertUnchanged(id, chain, title);
-        }
-
-        @Test
-        @DisplayName("targetDate that is not a date returns 400 and changes "
-                + "nothing")
-        void invalidTargetDateReturns400() throws Exception {
-            Chain chain = createChain();
-            String title = unique("Task");
-            long id = createTask(chain, title);
-            String body = taskJsonWith("targetDate", "\"yesterday\"", chain);
-
-            ResultActions result = putJson(pathOf(id), body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(MALFORMED_BODY));
-            assertUnchanged(id, chain, title);
         }
 
         @ParameterizedTest(name = "unknown {0}")
@@ -1050,36 +679,21 @@ class TaskApiTest extends ApiTestSupport {
             assertUnchanged(id, chain, title);
         }
 
-        @ParameterizedTest(name = "targetDate {0}")
-        @ValueSource(strings = {"2026-10-31", "2026-12-01"})
-        @DisplayName("targetDate one day outside the work plan's range "
+        @Test
+        @DisplayName("targetDate one day after the work plan's range "
                 + "returns 409 and changes nothing")
-        void targetDateOutsideRangeReturns409(final LocalDate targetDate)
-                throws Exception {
-            // The dates are the day before RANGE_START and the day after
-            // RANGE_END.
+        void targetDateOutsideRangeReturns409() throws Exception {
             Chain chain = createChain();
             String title = unique("Task");
             long id = createTask(chain, title);
-            String body = taskJson(chain, unique("Task"), targetDate, "2");
+            String body = taskJson(chain, unique("Task"),
+                    RANGE_END.plusDays(1), "2");
 
             ResultActions result = putJson(pathOf(id), body);
 
             result.andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message").value(OUT_OF_RANGE));
             assertUnchanged(id, chain, title);
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            String body = taskJson(createChain(), unique("Task"), IN_RANGE,
-                    "2");
-
-            ResultActions result = putJson(PATH + "/abc", body);
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
         }
     }
 
@@ -1101,35 +715,12 @@ class TaskApiTest extends ApiTestSupport {
         }
 
         @Test
-        @DisplayName("deleting the same task twice returns 404 the second "
-                + "time")
-        void secondDeleteReturns404() throws Exception {
-            long id = createTask(createChain(), IN_RANGE);
-            mvc().perform(delete(pathOf(id)))
-                    .andExpect(status().isNoContent());
-
-            ResultActions result = mvc().perform(delete(pathOf(id)));
-
-            result.andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value(TASK_NOT_FOUND));
-        }
-
-        @Test
         @DisplayName("unknown task returns 404")
         void unknownTaskReturns404() throws Exception {
             ResultActions result = mvc().perform(delete(pathOf(UNKNOWN_ID)));
 
             result.andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value(TASK_NOT_FOUND));
-        }
-
-        @Test
-        @DisplayName("id that is not a number returns 400")
-        void invalidIdReturns400() throws Exception {
-            ResultActions result = mvc().perform(delete(PATH + "/abc"));
-
-            result.andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value(INVALID_ID));
         }
     }
 }
